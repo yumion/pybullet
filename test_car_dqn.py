@@ -11,14 +11,14 @@ import numpy as np
 import gym
 from gym import spaces
 import matplotlib.pyplot as plt
-get_ipython().run_line_magic('matplotlib', 'inline')
+
 
 
 # In[2]:
 
 
 class Test_car(gym.Env):
-    
+
     def __init__(self):
         print("init")
         super().__init__()
@@ -32,14 +32,14 @@ class Test_car(gym.Env):
         self.maxForce = 10
         self._reset()
         print("init_reset終了")
-            
+
     def _reset(self):
         print("reset")
         self.done = False
         self.steps = 0
         targetX, targetY = np.random.permutation(np.arange(10))[0:2]
         self.targetPos = [targetX, targetY, 0]
-        
+
         '''pybullet側'''
         #bulletの世界をリセット
         p.resetSimulation()
@@ -47,60 +47,60 @@ class Test_car(gym.Env):
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0,0,-10)
         self.planeId = p.loadURDF("plane.urdf")
-        
+
         #オブジェクトモデルを表示
-        p.setAdditionalSearchPath("/home/dl-box/ros_ws/src/test_car_description/urdf/")
+        p.setAdditionalSearchPath("/home/dl-box/atsushi/github/ros_ws/src/test_car_description/urdf/")
         self.startPos = [0,0,0]
         self.startOrientation = p.getQuaternionFromEuler([0,0,0])
         self.car = p.loadURDF("test_car.urdf", self.startPos, self.startOrientation)
-        
+
         # ターゲットを表示
         self.target = p.createCollisionShape(
             p.GEOM_CYLINDER, radius=0.2, height=2, collisionFramePosition=self.targetPos)
         p.createMultiBody(0, self.target)
-        
+
         print("reset end")
         return self.observation()
-        
+
     def _step(self, action):
         print("step")
         self.steps += 1
         if action == 0:
             #前進
             p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL, 
+                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
                 targetVelocities=[20,20,20,20],
                 forces=np.ones(4)*self.maxForce)
         elif action == 1:
             #右
             p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL, 
+                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
                 targetVelocities=[20,12,20,12],
                 forces=np.ones(4)*self.maxForce)
         elif action == 2:
             #後退
             p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL, 
+                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
                 targetVelocities=[-20,-20,-20,-20],
                 forces=np.ones(4)*self.maxForce)
         elif action == 3:
             #左
             p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL, 
+                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
                 targetVelocities=[12,20,12,20],
                 forces=np.ones(4)*self.maxForce)
-        
+
         for i in range(200):
             p.stepSimulation()
             time.sleep(1./240.)
-        
+
         observation = self.observation()
         reward = self.reward()
         self.done = self.is_done()
         print("step end")
         return observation, reward, self.done, {}
-        
-        
+
+
     def _render(self, mode='rgb_array', close=False):
         print("render")
         if mode != "rgb_array":
@@ -126,23 +126,23 @@ class Test_car(gym.Env):
         rgb_array = np.array(rgb)
         rgb_array = rgb_array[:,:,:3]
         mask_array = np.array(mask)
-        
+
         print("render end")
         return rgb_array
-    
+
     def _close(self):
         pass
 
     def _seed(self, seed=None):
         pass
-    
+
     def observation(self):
         print("observation")
         rgb_array = self._render()
         rgb_array = rgb_array/255.0
-        
+
         return rgb_array
-        
+
     def is_done(self):
         print("is_done")
         distance = p.getClosestPoints(
@@ -151,14 +151,14 @@ class Test_car(gym.Env):
             self.done = True
         print("is_done end")
         return self.done
-    
+
     def reward(self):
         print("reward")
         if self.done: reward = 1
         else: reward = -1
         print("reward end")
         return reward
-        
+
 
 
 # In[3]:
@@ -309,4 +309,3 @@ dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v0"), overwrite=True)
 
 # Finally, evaluate our algorithm for 5 episodes.
 dqn.test(env, nb_episodes=5, visualize=True)
-
