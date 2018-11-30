@@ -1,0 +1,8 @@
+# jupyter notebook
+.ipynb_checkpoints/
+
+# MacOS
+.DS_Store
+
+# model's weight (too heavy)
+*.pkl
