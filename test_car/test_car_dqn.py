@@ -13,6 +13,7 @@ import cv2
 class Test_car(gym.Env):
 
     def __init__(self):
+        
         print("init")
         super().__init__()
         self.episodes = 0
@@ -137,48 +138,29 @@ class Test_car(gym.Env):
 
         return rgb_array
 
-    def green_detect(self, img):
-        '''緑色のマスク'''
-        # HSV色空間に変換
-        hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        # 緑色のHSVの値域
-        hsv_min = np.array([50, 100, 100])
-        hsv_max = np.array([70, 255, 255])
-        mask = cv2.inRange(hsv, hsv_min, hsv_max)
-        return mask
-
-    def calc_area(self, img):
-        '''面積計算'''
-        img = self.green_detect(img)
-        pix_area = cv2.countNonZero(img)  # ピクセル数
-        # パーセントを算出
-        h, w = img.shape  # frameの面積
-        per = round(100 * float(pix_area) / (w * h), 3)  # 0-100で規格化
-        print('GREEN_AREA: ', per)
-        return per
-
-    def is_done(self):
-
-        frame = self.render()
-        self.area = self.calc_area(frame)
-        if self.area >= 80:
-            done = True
-        elif self.steps > self.max_steps:
-            done = True
-        else:
-            done = False
-        return done
-
     def reward(self):
 
-        if self.area >= 80:
+        if self.distance <= 0:
             reward = 1
         elif self.steps > self.max_steps:
             reward = -1
         else:
             reward = 0
         print("reward: ", reward)
+
         return reward
+
+    def is_done(self):
+
+        self.distance = p.getClosestPoints(
+            bodyA=self.car, bodyB=self.target, distance=1000, linkIndexA=0)[0][8]
+        if self.distance <= 0:
+            self.done = True
+        elif self.steps > self.max_steps:
+            self.done = True
+        print("distance: ", self.distance)
+
+        return self.done
 
 
 env = Test_car()
