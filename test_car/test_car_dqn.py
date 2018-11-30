@@ -1,6 +1,5 @@
 # coding: utf-8
 
-
 import pybullet as p
 import time
 import numpy as np
@@ -16,7 +15,7 @@ class Test_car(gym.Env):
         print("init")
         super().__init__()
         self.episodes = 0
-        self.max_steps = 30
+        self.max_steps = 10
         self.height = 64
         self.width = 64
         self.action_space = spaces.Discrete(4) #前後左右
@@ -31,7 +30,7 @@ class Test_car(gym.Env):
 
     def reset(self):
 
-        print("====episode:"+str(self.episodes)+"=================")
+        print("\n====episode:"+str(self.episodes)+"=================")
         self.episodes += 1
         self.steps = 0
         targetX, targetY = np.random.permutation(np.arange(10))[0:2]
@@ -42,7 +41,7 @@ class Test_car(gym.Env):
         p.resetSimulation()
         #フィールドを表示
         p.setGravity(0,0,-10)
-        self.planeId = p.loadURDF("plane100.urdf")
+        self.plane = p.loadURDF("plane100.urdf")
 
         #オブジェクトモデルを表示
         self.startPos = [0,0,0]
@@ -58,7 +57,7 @@ class Test_car(gym.Env):
 
     def step(self, action):
 
-        print("---step:"+str(self.steps)+"-------")
+        print("\n---step:"+str(self.steps)+"-------")
         self.steps += 1
         if action == 0:
             #前進
@@ -223,7 +222,7 @@ dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmu
                target_model_update=1e-2, policy=policy)
 dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 
-dqn.fit(env, nb_steps=100000, visualize=True, verbose=1)
+dqn.fit(env, nb_steps=100000, visualize=True, verbose=0)
 
 # After training is done, we save the final weights.
 dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v0"), overwrite=True)
