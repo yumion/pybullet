@@ -183,41 +183,50 @@ class Test_car(gym.Env):
 
 env = Test_car()
 
-#これらとpybulletのウィンドウ表示(p.connect)を分けないとカーネルが死ぬ
-from baselines import deepq
-import datetime
+
+from keras.models import Sequential
+from keras.layers import InputLayer, Dense, Reshape, Conv2D, Flatten, MaxPooling2D, BatchNormalization, Dropout
+from keras.optimizers import Adam
+
+from rl.agents.dqn import DQNAgent
+from rl.policy import BoltzmannQPolicy
+from rl.memory import SequentialMemory
+
+nb_actions = 4
 
 
-def callback(lcl, glb):
-    # stop training if reward exceeds 199
-    total = sum(lcl['episode_rewards'][-101:-1]) / 100
-    totalt = lcl['t']
-    is_solved = totalt > 2000 and total >= 20
-    return is_solved
-'''
-cnn_to_mlp(convs, hiddens, dueling=False, layer_norm=False)
-    - convs: [(int, int, int)]
-        list of convolutional layers in form of
-        (num_outputs, kernel_size, stride)
-    - hiddens: [int]
-        list of sizes of hidden layers
-'''
+model = Sequential()
 
-model = deepq.models.cnn_to_mlp([(512,5,1)], [256,64,4])
+model.add(Reshape((64, 64, 3), input_shape=(1,) + env.observation_space.shape))
+model.add(Conv2D(8, kernel_size=(5,5), activation='relu'))
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2,2)))
+model.add(Conv2D(16, kernel_size=(5,5), activation='relu'))
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2,2)))
+model.add(Conv2D(32, kernel_size=(5,5), activation='relu'))
+model.add(BatchNormalization())
+model.add(MaxPooling2D(pool_size=(2,2)))
+model.add(Flatten())
+model.add(Dense(256, activation='relu'))
+model.add(Dropout(0.25))
+model.add(Dense(64, activation='relu'))
+model.add(Dropout(0.5))
+model.add(Dense(nb_actions, activation='linear'))
+
+print(model.summary())
 
 
-act = deepq.learn(
-    env,
-    q_func=model,
-    lr=1e-2,
-    max_timesteps=100000,
-    buffer_size=50000,
-    exploration_fraction=0.1,
-    exploration_final_eps=0.02,
-    print_freq=1,
-    callback=callback)
+memory = SequentialMemory(limit=100000, window_length=1)
+policy = BoltzmannQPolicy()
+dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=10,
+               target_model_update=1e-2, policy=policy)
+dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 
-print("Saving model to test_car_model.pkl")
-act.save("test_car_model.pkl")
+dqn.fit(env, nb_steps=100000, visualize=True, verbose=1)
 
-p.disconnect()
+# After training is done, we save the final weights.
+dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v0"), overwrite=True)
+
+# Finally, evaluate our algorithm for 5 episodes.
+dqn.test(env, nb_episodes=5, visualize=True)
