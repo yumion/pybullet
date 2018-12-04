@@ -1,6 +1,4 @@
 # coding: utf-8
-
-
 import pybullet as p
 import time
 import numpy as np
@@ -9,22 +7,21 @@ from gym import spaces
 import cv2
 
 
-
 class Test_car(gym.Env):
 
     def __init__(self):
         print("init")
         super().__init__()
         self.episodes = 0
-        self.max_steps = 30
+        self.max_steps = 10
         self.height = 64
         self.width = 64
         self.action_space = spaces.Discrete(4) #前後左右
         self.observation_space = spaces.Box(0, 255, [self.height, self.width, 3]) #Boxは連続値
         self.reward_range = [-1,1]
         '''pybullet側の初期設定'''
-        p.connect(p.GUI)
-        p.setAdditionalSearchPath("../ros_ws/src/test_car_description/urdf/")
+        p.connect(p.DIRECT)
+        p.setAdditionalSearchPath("../catkin_ws/src/simple_car/simple_car_description/urdf/")
         self.maxForce = 10
         self.reset()
         print("init_reset終了")
@@ -34,15 +31,13 @@ class Test_car(gym.Env):
         print("====episode:"+str(self.episodes)+"=================")
         self.episodes += 1
         self.steps = 0
-        targetX, targetY = np.random.permutation(np.arange(10))[0:2]
-        self.targetPos = [targetX, targetY, 0]
 
         '''pybullet側'''
         #bulletの世界をリセット
         p.resetSimulation()
         #フィールドを表示
         p.setGravity(0,0,-10)
-        self.planeId = p.loadURDF("plane100.urdf")
+        self.plane = p.loadURDF("plane100.urdf")
 
         #オブジェクトモデルを表示
         self.startPos = [0,0,0]
@@ -50,6 +45,8 @@ class Test_car(gym.Env):
         self.car = p.loadURDF("test_car.urdf", self.startPos, self.startOrientation)
 
         # ターゲットを表示
+        targetX, targetY = np.random.permutation(np.arange(10))[0:2]
+        self.targetPos = [targetX, targetY, 0]
         self.target = p.createCollisionShape(
             p.GEOM_CYLINDER, radius=0.2, height=2, collisionFramePosition=self.targetPos)
         p.createMultiBody(0, self.target)
@@ -87,7 +84,7 @@ class Test_car(gym.Env):
 
         for i in range(200):
             p.stepSimulation()
-            time.sleep(1./240.)
+            #time.sleep(1./240.)
 
         observation = self.observation()
         done = self.is_done()
@@ -172,11 +169,11 @@ class Test_car(gym.Env):
     def reward(self):
 
         if self.area >= 80:
-            reward = 1
+            reward = 100
         elif self.steps > self.max_steps:
-            reward = -1
+            reward = -50
         else:
-            reward = 0
+            reward = self.area
         print("reward: ", reward)
         return reward
 
@@ -214,7 +211,7 @@ act = deepq.learn(
     buffer_size=50000,
     exploration_fraction=0.1,
     exploration_final_eps=0.02,
-    print_freq=1,
+    print_freq=10,
     callback=callback)
 
 print("Saving model to test_car_model.pkl")
