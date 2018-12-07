@@ -1,5 +1,4 @@
 # coding: utf-8
-
 import pybullet as p
 import time
 import numpy as np
@@ -8,22 +7,22 @@ from gym import spaces
 import cv2
 
 
-
 class Test_car(gym.Env):
 
     def __init__(self):
         print("init")
         super().__init__()
         self.episodes = 0
-        self.max_steps = 10
+        self.max_steps = 50
         self.height = 64
         self.width = 64
         self.action_space = spaces.Discrete(4) #前後左右
         self.observation_space = spaces.Box(0, 255, [self.height, self.width, 3]) #Boxは連続値
         self.reward_range = [-1,1]
         '''pybullet側の初期設定'''
+        #p.connect(p.DIRECT)
         p.connect(p.GUI)
-        p.setAdditionalSearchPath("../ros_ws/src/test_car_description/urdf/")
+        p.setAdditionalSearchPath("../../catkin_ws/src/simple_car/simple_car_description/urdf/")
         self.maxForce = 10
         self.reset()
         print("init_reset終了")
@@ -63,25 +62,25 @@ class Test_car(gym.Env):
             #前進
             p.setJointMotorControlArray(
                 self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[20,20,20,20],
+                targetVelocities=[10,10,10,10],
                 forces=np.ones(4)*self.maxForce)
         elif action == 1:
             #右
             p.setJointMotorControlArray(
                 self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[20,12,20,12],
+                targetVelocities=[10,6,10,6],
                 forces=np.ones(4)*self.maxForce)
         elif action == 2:
             #後退
             p.setJointMotorControlArray(
                 self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[-20,-20,-20,-20],
+                targetVelocities=[-10,-10,-10,-10],
                 forces=np.ones(4)*self.maxForce)
         elif action == 3:
             #左
             p.setJointMotorControlArray(
                 self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[12,20,12,20],
+                targetVelocities=[6,10,6,10],
                 forces=np.ones(4)*self.maxForce)
 
         for i in range(200):
@@ -171,11 +170,11 @@ class Test_car(gym.Env):
     def reward(self):
 
         if self.area >= 80:
-            reward = 1
+            reward = 100
         elif self.steps > self.max_steps:
-            reward = -1
+            reward = -50
         else:
-            reward = 0
+            reward = self.area
         print("reward: ", reward)
         return reward
 
