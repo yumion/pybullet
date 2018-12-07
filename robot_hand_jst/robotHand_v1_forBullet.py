@@ -1,18 +1,10 @@
-
 # coding: utf-8
-
-# In[1]:
-
-
 import numpy as np
 import cv2
 import time
 from datetime import datetime  # 時刻を取得
 import pybullet as p
 import pybullet_data
-
-
-# In[2]:
 
 
 '''定数の設定'''
@@ -30,9 +22,6 @@ TEST_MODE = False
 ADD_TRAIN_MODE = True
 
 
-# In[3]:
-
-
 class Agent:
     '''CartPoleのエージェントクラスです、棒付き台車そのものになります'''
 
@@ -47,9 +36,6 @@ class Agent:
         '''行動の決定'''
         action = self.brain.decide_action(observation, step)
         return action
-
-
-# In[4]:
 
 
 class Brain:
@@ -74,7 +60,7 @@ class Brain:
             np.digitize(area_v, bins=self.bins(-10.0, 10.0, NUM_DIZITIZED))
         ]
         return sum([x * (NUM_DIZITIZED**i) for i, x in enumerate(digitized)]) #　6進数で表して計算を圧縮
-    
+
     def update_Q_table(self, observation, action, reward, observation_next):
         '''QテーブルをQ学習により更新'''
         state = self.digitize_state(observation)  # 状態を離散化
@@ -103,9 +89,6 @@ class Brain:
         return action
 
 
-# In[5]:
-
-
 class  Environment:
     '''CartPoleを実行する環境のクラスです'''
 
@@ -116,7 +99,7 @@ class  Environment:
         '''pybullet'''
         p.connect(p.GUI)
         self.maxForce = 10
-        
+
     def renderPicture(self, height=320, width=320):
         '''bullet側からカメラ画像を取得'''
         base_pos, orn = p.getBasePositionAndOrientation(self.car)
@@ -166,21 +149,21 @@ class  Environment:
     def reset(self):
         '''環境を初期化する'''
         print('Environment.reset\n')
-        
+
         #bulletの世界をリセット
         p.resetSimulation()
-        
+
         #フィールドを表示
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0,0,-10)
-        self.planeId = p.loadURDF("plane.urdf")
-        
+        self.planeId = p.loadURDF("plane100.urdf")
+
         #オブジェクトモデルを表示
-        p.setAdditionalSearchPath("/home/dl-box/atsushi/github/onodera-lab/ros_ws/src/test_car_description/urdf/")
+        p.setAdditionalSearchPath("../../catkin_ws/src/simple_car/simple_car_description/urdf/")
         self.startPos = [0,0,0]
         self.startOrientation = p.getQuaternionFromEuler([0,0,0])
         self.car = p.loadURDF("test_car.urdf", self.startPos, self.startOrientation)
-        
+
         # ターゲットを表示
         targetX, targetY = np.random.permutation(np.arange(10))[0:2]
         self.targetPos = [targetX, targetY, 0]
@@ -194,7 +177,7 @@ class  Environment:
         area_v = 0
 
         observation = (area_sum, area_v)
-        
+
         return observation, frame
 
     def get_env(self, area_sum_before):
@@ -218,43 +201,43 @@ class  Environment:
             self.right()
         elif action == 3:  # 左
             self.left()
-        
+
         for i in range(50):
             p.stepSimulation()
             time.sleep(1./240.)
-        
+
         area_sum, _ = observation
         observation_next, _ = self.get_env(area_sum)
         done = self.is_done(observation_next)
-        
+
         return observation_next, done
 
     def go(self):
         p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL, 
-                targetVelocities=[20,20,20,20],
+                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
+                targetVelocities=[10,10,10,10],
                 forces=np.ones(4)*self.maxForce)
     def back(self):
         p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL, 
-                targetVelocities=[-20,-20,-20,-20],
+                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
+                targetVelocities=[-10,-10,-10,-10],
                 forces=np.ones(4)*self.maxForce)
     def right(self):
         p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL, 
-                targetVelocities=[20,12,20,12],
+                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
+                targetVelocities=[10,6,10,6],
                 forces=np.ones(4)*self.maxForce)
     def left(self):
         p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL, 
-                targetVelocities=[12,20,12,20],
+                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
+                targetVelocities=[6,10,6,10],
                 forces=np.ones(4)*self.maxForce)
     def stop(self):
         p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL, 
+                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
                 targetVelocities=[0,0,0,0],
                 forces=np.ones(4)*self.maxForce)
-    
+
     def is_done(self, observation):
         '''observationによって終了判定をする'''
         #終了判定は面積が閾値以上&面積の変化なし（重心位置が画像の真ん中？カメラの位置によるけど，とりあえずはなし）
@@ -318,10 +301,6 @@ class  Environment:
                 print('10回連続成功\n次で最終試行')
                 is_episode_final = True  # 次の試行を最終試行とする
 
-
-# In[ ]:
-
-
+# main
 robot_hand_env = Environment()
 robot_hand_env.run()
-
