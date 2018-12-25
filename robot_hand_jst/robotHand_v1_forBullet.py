@@ -22,7 +22,7 @@ TEST_MODE = False
 ADD_TRAIN_MODE = True
 
 '''pybulletに描画するか'''
-RENDER = True
+RENDER = False
 
 class Agent:
     '''CartPoleのエージェントクラスです、棒付き台車そのものになります'''
@@ -153,12 +153,14 @@ class  Environment:
         # パーセントを算出
         h, w = img.shape  # frameの面積
         per = round(100 * float(pix_area) / (w * h), 3)  # 0-100で規格化
-        print('GREEN_AREA: ', per)
+        if RENDER:
+            print('GREEN_AREA: ', per)
         return pix_area, per
 
     def reset(self):
         '''環境を初期化する'''
-        print('Environment.reset\n')
+        if RENDER:
+            print('Environment.reset\n')
 
         #bulletの世界をリセット
         p.resetSimulation()
@@ -260,15 +262,19 @@ class  Environment:
 
     def run(self):
         '''実行'''
-        print('Environment.run')
+        if RENDER:
+            print('Environment.run')
         complete_episodes = 0  # 連続で取り続けた試行数
         is_episode_final = False  # 最終試行フラグ
 
         for episode in range(NUM_EPISODES):  # 試行数分繰り返す
+            if not RENDER:
+                print('Episode:', episode+1)
             observation, frame = self.reset()  # 環境の初期化
 
             for step in range(MAX_STEPS):  # 1エピソードのループ
-                print('Step: {0} of Episode: {1}'.format(step+1, episode))
+                if RENDER:
+                    print('Step: {0} of Episode: {1}'.format(step+1, episode))
                 # 行動を求める
                 action = self.agent.get_action(observation, episode)
                 # 行動a_tの実行により、s_{t+1}, r_{t+1}を求める
@@ -280,8 +286,10 @@ class  Environment:
                     print('reward: ', reward)
                     complete_episodes += 1  # 連続記録を更新
                 else:
-                    reward = observation_next[0]  # 途中の報酬は0
-                    print('reward: ', reward)
+                    reward = -0.05  # 途中の報酬は0
+                    # reward = observation_next[0] #面積を報酬として与える
+                    if RENDER:
+                        print('reward: ', reward)
 
                 # step+1の状態observation_nextを用いて,Q関数を更新する
                 if TEST_MODE:  # 保存したQ-TABLEを使用する
@@ -299,17 +307,17 @@ class  Environment:
 
                 # 1episode内でdoneできなかったら罰を与える
                 if step == MAX_STEPS-1:
-                    reward = -30
+                    reward = -20
                     print('reward: ', reward)
-                    complete_episodes = 0  # 30step以上連続で立ち続けた試行数をリセット
+                    complete_episodes = 0  # 連続で立ち続けた試行数をリセット
 
             if is_episode_final is True:
                 Brain(num_states=self.num_states, num_actions=self.num_actions).save_Q_table()  # Q-tableを保存する
                 print('finished')
                 break
 
-            if complete_episodes >= 50:  # 59連続成功なら
-                print('50回連続成功\n次で最終試行')
+            if complete_episodes >= 10:  # 10回連続成功なら
+                print('10回連続成功\n次で最終試行')
                 is_episode_final = True  # 次の試行を最終試行とする
 
 # main
