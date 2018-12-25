@@ -13,7 +13,7 @@ discount = 0.99  # 時間割引率
 lr = 0.5  # 学習係数
 MAX_STEPS = 30  # 1試行のstep数cartpoleは195steps立ち続ければ終わり
 NUM_EPISODES = 100000  # 最大試行回数
-AREA_THRESH = 80  # 赤色物体面積の閾値．0~100で規格化してある
+AREA_THRESH = 60  # 赤色物体面積の閾値．0~100で規格化してある
 
 '''学習するときはFalse，学習済みのモデルを使用するときはTrue'''
 # 使うq_tableのファイル名を"trained_q_table.npy"とすること
@@ -21,6 +21,8 @@ TEST_MODE = False
 '''追加学習するときはTrue'''
 ADD_TRAIN_MODE = True
 
+'''pybulletに描画するか'''
+RENDER = True
 
 class Agent:
     '''CartPoleのエージェントクラスです、棒付き台車そのものになります'''
@@ -97,15 +99,23 @@ class  Environment:
         self.num_actions = 4  # ロボットハンドの行動（前進，後退，右旋回，左旋回，握る，離す，止まる）
         self.agent = Agent(self.num_states, self.num_actions)  # 環境内で行動するAgentを生成
         '''pybullet'''
-        p.connect(p.GUI)
+        if RENDER:
+            p.connect(p.GUI)
+        else:
+            p.connect(p.DIRECT)
         self.maxForce = 10
 
     def renderPicture(self, height=320, width=320):
         '''bullet側からカメラ画像を取得'''
         base_pos, orn = p.getBasePositionAndOrientation(self.car)
-        cam_eye = np.array(base_pos) + [0.1,0,0.2]
-        cam_target = np.array(base_pos) + [2,0,0.2]
-        cam_upvec = [1,0,1]
+        yaw = p.getEulerFromQuaternion(orn)[2]
+        rot_matrix = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]])
+        target_relative_vec2D = np.array([2,0])
+        target_abs_vec2D = np.dot(rot_matrix, target_relative_vec2D)
+
+        cam_eye = np.array(base_pos) + np.array([0,0,0.2])
+        cam_target = np.array(base_pos) + np.append(target_abs_vec2D, 0.2)
+        cam_upvec = [0,0,1]
 
         view_matrix = p.computeViewMatrix(
                 cameraEyePosition=cam_eye,
@@ -122,7 +132,7 @@ class  Environment:
 
         rgb_array = np.array(rgb)
         rgb_array = rgb_array[:,:,:3]
-        mask_array = np.array(mask)
+        # mask_array = np.array(mask)
 
         return rgb_array
 
@@ -182,7 +192,7 @@ class  Environment:
 
     def get_env(self, area_sum_before):
         '''環境を認識する'''
-        '''カメラで写真をとりOpencv2で面積と重心を取得する'''
+        '''カメラで写真をとりOpenCVで面積と重心を取得する'''
         frame = self.renderPicture()
         # 赤色の面積とその変化量, 重心の位置とその変化量を取得する
         _, area_sum = self.calc_area(frame)
@@ -202,9 +212,10 @@ class  Environment:
         elif action == 3:  # 左
             self.left()
 
-        for i in range(50):
+        for i in range(200):
             p.stepSimulation()
-            time.sleep(1./240.)
+            if RENDER:
+                time.sleep(1./240.)
 
         area_sum, _ = observation
         observation_next, _ = self.get_env(area_sum)
@@ -265,12 +276,12 @@ class  Environment:
 
                 # 報酬を与える
                 if done:
-                    reward = 1  # 目標を掴んだら報酬1を与える
-                    print ('reward: +1')
+                    reward = 100  # 目標を掴んだら報酬1を与える
+                    print('reward: ', reward)
                     complete_episodes += 1  # 連続記録を更新
                 else:
-                    reward = 0  # 途中の報酬は0
-                    print ('reward: 0')
+                    reward = observation_next[0]  # 途中の報酬は0
+                    print('reward: ', reward)
 
                 # step+1の状態observation_nextを用いて,Q関数を更新する
                 if TEST_MODE:  # 保存したQ-TABLEを使用する
@@ -288,17 +299,17 @@ class  Environment:
 
                 # 1episode内でdoneできなかったら罰を与える
                 if step == MAX_STEPS-1:
-                    reward = -1
-                    print('reward: -1')
-                    complete_episodes = 0  # 4step以上連続で立ち続けた試行数をリセット
+                    reward = -30
+                    print('reward: ', reward)
+                    complete_episodes = 0  # 30step以上連続で立ち続けた試行数をリセット
 
-            if is_episode_final is True:  # 最終試行では動画を保存と描画
+            if is_episode_final is True:
                 Brain(num_states=self.num_states, num_actions=self.num_actions).save_Q_table()  # Q-tableを保存する
                 print('finished')
                 break
 
-            if complete_episodes >= 10:  # 5連続成功なら
-                print('10回連続成功\n次で最終試行')
+            if complete_episodes >= 50:  # 59連続成功なら
+                print('50回連続成功\n次で最終試行')
                 is_episode_final = True  # 次の試行を最終試行とする
 
 # main
