@@ -7,6 +7,7 @@ import pybullet as p
 import pybullet_data
 
 
+
 '''定数の設定'''
 NUM_DIZITIZED = 6  # 各状態の離散値への分割数
 discount = 0.99  # 時間割引率
@@ -108,13 +109,13 @@ class  Environment:
     def renderPicture(self, height=320, width=320):
         '''bullet側からカメラ画像を取得'''
         base_pos, orn = p.getBasePositionAndOrientation(self.car)
-        yaw = p.getEulerFromQuaternion(orn)[2]
-        rot_matrix = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]])
-        target_relative_vec2D = np.array([2,0])
-        target_abs_vec2D = np.dot(rot_matrix, target_relative_vec2D)
+        yaw = p.getEulerFromQuaternion(orn)[2] # z軸方向から見た本体の回転角度
+        rot_matrix = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]]) # 回転行列
+        target_relative_vec2D = np.array([2,0]) # 本体から見たtargetの相対位置
+        target_abs_vec2D = np.dot(rot_matrix, target_relative_vec2D) # targetの絶対位置
 
         cam_eye = np.array(base_pos) + np.array([0,0,0.2])
-        cam_target = np.array(base_pos) + np.append(target_abs_vec2D, 0.2)
+        cam_target = np.array(base_pos) + np.append(target_abs_vec2D, 0.2) # z=0.2は足()
         cam_upvec = [0,0,1]
 
         view_matrix = p.computeViewMatrix(
@@ -282,11 +283,11 @@ class  Environment:
 
                 # 報酬を与える
                 if done:
-                    reward = 100  # 目標を掴んだら報酬1を与える
+                    reward = 1  # 目標を掴んだら報酬1を与える
                     print('reward: ', reward)
                     complete_episodes += 1  # 連続記録を更新
                 else:
-                    reward = -0.05  # 途中の報酬は0
+                    reward = 0 # 途中の報酬は0
                     # reward = observation_next[0] #面積を報酬として与える
                     if RENDER:
                         print('reward: ', reward)
@@ -307,7 +308,7 @@ class  Environment:
 
                 # 1episode内でdoneできなかったら罰を与える
                 if step == MAX_STEPS-1:
-                    reward = -20
+                    reward = -1
                     print('reward: ', reward)
                     complete_episodes = 0  # 連続で立ち続けた試行数をリセット
 
