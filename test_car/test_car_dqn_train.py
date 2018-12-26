@@ -6,6 +6,7 @@ import gym
 from gym import spaces
 import cv2
 
+RENDER = True
 
 class Test_car(gym.Env):
 
@@ -20,8 +21,11 @@ class Test_car(gym.Env):
         self.observation_space = spaces.Box(0, 255, [self.height, self.width, 3]) #Boxは連続値
         self.reward_range = [-1,1]
         '''pybullet側の初期設定'''
-        p.connect(p.DIRECT)
-        p.setAdditionalSearchPath("../catkin_ws/src/simple_car/simple_car_description/urdf/")
+        if RENDER:
+            p.connect(p.GUI)
+        else:
+            p.connect(p.DIRECT)
+        p.setAdditionalSearchPath("../../catkin_ws/src/simple_car/simple_car_description/urdf/")
         self.maxForce = 10
         self.reset()
         print("init_reset終了")
@@ -84,7 +88,8 @@ class Test_car(gym.Env):
 
         for i in range(200):
             p.stepSimulation()
-            #time.sleep(1./240.)
+            if RENDER:
+                time.sleep(1./240.)
 
         observation = self.observation()
         done = self.is_done()
