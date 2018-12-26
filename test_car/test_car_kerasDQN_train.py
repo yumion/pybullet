@@ -237,6 +237,3 @@ dqn.fit(env, nb_steps=100000, visualize=True, verbose=0)
 
 # After training is done, we save the final weights.
 dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v0"), overwrite=True)
-
-# Finally, evaluate our algorithm for 5 episodes.
-dqn.test(env, nb_episodes=5, visualize=True)
