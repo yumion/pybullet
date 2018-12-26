@@ -98,9 +98,14 @@ class Test_car(gym.Env):
         if mode != "rgb_array":
             return np.array([])
         base_pos, orn = p.getBasePositionAndOrientation(self.car)
-        cam_eye = np.array(base_pos) + [0.1,0,0.2]
-        cam_target = np.array(base_pos) + [2,0,0.2]
-        cam_upvec = [1,0,1]
+        yaw = p.getEulerFromQuaternion(orn)[2] # z軸方向から見た本体の回転角度
+        rot_matrix = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]]) # 回転行列
+        target_relative_vec2D = np.array([2,0]) # 本体から見たtargetの相対位置
+        target_abs_vec2D = np.dot(rot_matrix, target_relative_vec2D) # targetの絶対位置
+
+        cam_eye = np.array(base_pos) + np.array([0,0,0.2])
+        cam_target = np.array(base_pos) + np.append(target_abs_vec2D, 0.2) # z=0.2は足()
+        cam_upvec = [0,0,1]
 
         view_matrix = p.computeViewMatrix(
                 cameraEyePosition=cam_eye,
@@ -200,7 +205,7 @@ cnn_to_mlp(convs, hiddens, dueling=False, layer_norm=False)
         list of sizes of hidden layers
 '''
 
-model = deepq.models.cnn_to_mlp([(512,5,1)], [256,64,4])
+model = deepq.models.cnn_to_mlp(convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)], hiddens=[256], dueling=False)
 
 
 act = deepq.learn(
