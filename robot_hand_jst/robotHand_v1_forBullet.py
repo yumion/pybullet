@@ -23,7 +23,7 @@ TEST_MODE = False
 ADD_TRAIN_MODE = True
 
 '''pybulletに描画するか'''
-RENDER = False
+RENDER = True
 
 class Agent:
     '''CartPoleのエージェントクラスです、棒付き台車そのものになります'''
