@@ -6,6 +6,7 @@ import gym
 from gym import spaces
 import cv2
 
+RENDER = False
 
 class Test_car(gym.Env):
 
@@ -13,15 +14,17 @@ class Test_car(gym.Env):
         print("init")
         super().__init__()
         self.episodes = 0
-        self.max_steps = 50
+        self.max_steps = 30
         self.height = 64
         self.width = 64
         self.action_space = spaces.Discrete(4) #前後左右
         self.observation_space = spaces.Box(0, 255, [self.height, self.width, 3]) #Boxは連続値
         self.reward_range = [-1,1]
         '''pybullet側の初期設定'''
-        #p.connect(p.DIRECT)
-        p.connect(p.GUI)
+        if RENDER:
+            p.connect(p.GUI)
+        else:
+            p.connect(p.DIRECT)
         p.setAdditionalSearchPath("../../catkin_ws/src/simple_car/simple_car_description/urdf/")
         self.maxForce = 10
         self.reset()
@@ -56,7 +59,8 @@ class Test_car(gym.Env):
 
     def step(self, action):
 
-        print("\n---step:"+str(self.steps)+"-------")
+        if RENDER:
+            print("\n---step:"+str(self.steps)+"-------")
         self.steps += 1
         if action == 0:
             #前進
@@ -85,7 +89,8 @@ class Test_car(gym.Env):
 
         for i in range(200):
             p.stepSimulation()
-            time.sleep(1./240.)
+            if RENDER:
+                time.sleep(1./240.)
 
         observation = self.observation()
         done = self.is_done()
@@ -99,9 +104,14 @@ class Test_car(gym.Env):
         if mode != "rgb_array":
             return np.array([])
         base_pos, orn = p.getBasePositionAndOrientation(self.car)
-        cam_eye = np.array(base_pos) + [0.1,0,0.2]
-        cam_target = np.array(base_pos) + [2,0,0.2]
-        cam_upvec = [1,0,1]
+        yaw = p.getEulerFromQuaternion(orn)[2] # z軸方向から見た本体の回転角度
+        rot_matrix = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]]) # 回転行列
+        target_relative_vec2D = np.array([2,0]) # 本体から見たtargetの相対位置
+        target_abs_vec2D = np.dot(rot_matrix, target_relative_vec2D) # targetの絶対位置
+
+        cam_eye = np.array(base_pos) + np.array([0,0,0.2])
+        cam_target = np.array(base_pos) + np.append(target_abs_vec2D, 0.2) # z=0.2は足()
+        cam_upvec = [0,0,1]
 
         view_matrix = p.computeViewMatrix(
                 cameraEyePosition=cam_eye,
@@ -152,14 +162,15 @@ class Test_car(gym.Env):
         # パーセントを算出
         h, w = img.shape  # frameの面積
         per = round(100 * float(pix_area) / (w * h), 3)  # 0-100で規格化
-        print('GREEN_AREA: ', per)
+        if RENDER:
+            print('GREEN_AREA: ', per)
         return per
 
     def is_done(self):
 
         frame = self.render()
         self.area = self.calc_area(frame)
-        if self.area >= 80:
+        if self.area >= 60:
             done = True
         elif self.steps > self.max_steps:
             done = True
@@ -169,12 +180,13 @@ class Test_car(gym.Env):
 
     def reward(self):
 
-        if self.area >= 80:
+        if self.area >= 60:
             reward = 100
         elif self.steps > self.max_steps:
             reward = -20
         else:
             reward = self.area
+
         print("reward: ", reward)
         return reward
 
@@ -212,7 +224,7 @@ model.add(Dense(64, activation='relu'))
 model.add(Dropout(0.5))
 model.add(Dense(nb_actions, activation='linear'))
 
-print(model.summary())
+# print(model.summary())
 
 
 memory = SequentialMemory(limit=100000, window_length=1)
