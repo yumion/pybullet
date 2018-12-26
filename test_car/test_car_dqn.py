@@ -172,7 +172,7 @@ class Test_car(gym.Env):
         if self.area >= 80:
             reward = 100
         elif self.steps > self.max_steps:
-            reward = -50
+            reward = -20
         else:
             reward = self.area
         print("reward: ", reward)
