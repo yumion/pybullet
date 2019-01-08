@@ -176,7 +176,9 @@ class  Environment:
         self.startPos = [0,0,0]
         self.startOrientation = p.getQuaternionFromEuler([0,0,0])
         self.car = p.loadURDF("test_car.urdf", self.startPos, self.startOrientation)
-
+        # 摩擦係数を変更
+        for joint in range(p.getNumJoints(self.car)):
+            p.changeDynamics(self.car, joint, lateralFriction=1.0)
         # ターゲットを表示
         targetX, targetY = np.random.permutation(np.arange(10))[0:2]
         self.targetPos = [targetX, targetY, 0]
