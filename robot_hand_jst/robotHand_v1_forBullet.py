@@ -5,7 +5,7 @@ import time
 from datetime import datetime  # 時刻を取得
 import pybullet as p
 import pybullet_data
-
+from PIL import Image
 
 
 '''定数の設定'''
@@ -14,7 +14,7 @@ discount = 0.99  # 時間割引率
 lr = 0.5  # 学習係数
 MAX_STEPS = 30  # 1試行のstep数cartpoleは195steps立ち続ければ終わり
 NUM_EPISODES = 100000  # 最大試行回数
-AREA_THRESH = 60  # 赤色物体面積の閾値．0~100で規格化してある
+AREA_THRESH = 40  # 赤色物体面積の閾値．0~100で規格化してある
 
 '''学習するときはFalse，学習済みのモデルを使用するときはTrue'''
 # 使うq_tableのファイル名を"trained_q_table.npy"とすること
@@ -177,13 +177,13 @@ class  Environment:
         self.startOrientation = p.getQuaternionFromEuler([0,0,0])
         self.car = p.loadURDF("test_car.urdf", self.startPos, self.startOrientation)
         # 摩擦係数を変更
-        for joint in range(p.getNumJoints(self.car)):
-            p.changeDynamics(self.car, joint, lateralFriction=1.0)
+        p.changeDynamics(self.car, 1, lateralFriction=100) # 前輪右
+        p.changeDynamics(self.car, 2, lateralFriction=100) # 前輪左
         # ターゲットを表示
         targetX, targetY = np.random.permutation(np.arange(10))[0:2]
         self.targetPos = [targetX, targetY, 0]
         self.target = p.createCollisionShape(
-            p.GEOM_CYLINDER, radius=0.2, height=2, collisionFramePosition=self.targetPos)
+            p.GEOM_CYLINDER, radius=0.5, height=2, collisionFramePosition=self.targetPos)
         p.createMultiBody(0, self.target)
 
         # 目標の面積, 重心の位置を取得する
@@ -231,22 +231,22 @@ class  Environment:
     def go(self):
         p.setJointMotorControlArray(
                 self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[10,10,10,10],
+                targetVelocities=[10,10,0,0],
                 forces=np.ones(4)*self.maxForce)
     def back(self):
         p.setJointMotorControlArray(
                 self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[-10,-10,-10,-10],
+                targetVelocities=[-10,-10,0,0],
                 forces=np.ones(4)*self.maxForce)
     def right(self):
         p.setJointMotorControlArray(
                 self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[10,6,10,6],
+                targetVelocities=[10,6,0,0],
                 forces=np.ones(4)*self.maxForce)
     def left(self):
         p.setJointMotorControlArray(
                 self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[6,10,6,10],
+                targetVelocities=[6,10,0,0],
                 forces=np.ones(4)*self.maxForce)
     def stop(self):
         p.setJointMotorControlArray(
@@ -269,6 +269,7 @@ class  Environment:
             print('Environment.run')
         complete_episodes = 0  # 連続で取り続けた試行数
         is_episode_final = False  # 最終試行フラグ
+        images = []
 
         for episode in range(NUM_EPISODES):  # 試行数分繰り返す
             if not RENDER:
@@ -278,6 +279,10 @@ class  Environment:
             for step in range(MAX_STEPS):  # 1エピソードのループ
                 if RENDER:
                     print('Step: {0} of Episode: {1}'.format(step+1, episode))
+                # ロボット視点の映像を保存
+                frame = self.renderPicture()
+                frame = Image.fromarray(frame)
+                images.append(frame)
                 # 行動を求める
                 action = self.agent.get_action(observation, episode)
                 # 行動a_tの実行により、s_{t+1}, r_{t+1}を求める
@@ -289,7 +294,7 @@ class  Environment:
                     print('reward: ', reward)
                     complete_episodes += 1  # 連続記録を更新
                 else:
-                    reward = 0 # 途中の報酬は0
+                    reward = -0.05 # 途中の報酬は0
                     # reward = observation_next[0] #面積を報酬として与える
                     if RENDER:
                         print('reward: ', reward)
@@ -316,6 +321,7 @@ class  Environment:
 
             if is_episode_final is True:
                 Brain(num_states=self.num_states, num_actions=self.num_actions).save_Q_table()  # Q-tableを保存する
+                images[0].save('final_episode.gif', save_all=True, append_images=images[1:], optimize=False, loop=1)
                 print('finished')
                 break
 
