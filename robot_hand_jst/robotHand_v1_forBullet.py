@@ -269,9 +269,9 @@ class  Environment:
             print('Environment.run')
         complete_episodes = 0  # 連続で取り続けた試行数
         is_episode_final = False  # 最終試行フラグ
-        images = []
 
         for episode in range(NUM_EPISODES):  # 試行数分繰り返す
+            images = [] # １試行の映像を格納
             if not RENDER:
                 print('Episode:', episode+1)
             observation, frame = self.reset()  # 環境の初期化
@@ -290,12 +290,13 @@ class  Environment:
 
                 # 報酬を与える
                 if done:
-                    reward = 1  # 目標を掴んだら報酬1を与える
+                    reward = 100  # 目標を掴んだら報酬1を与える
                     print('reward: ', reward)
                     complete_episodes += 1  # 連続記録を更新
+                    images[0].save('success_episode.gif', save_all=True, append_images=images[1:], optimize=False, loop=1, duration=1000) #成功エピソードの映像を保存
                 else:
-                    reward = -0.05 # 途中の報酬は0
-                    # reward = observation_next[0] #面積を報酬として与える
+                    # reward = -0.05 # 途中の報酬は0
+                    reward = -0.05 + observation_next[0] #面積を報酬として与える
                     if RENDER:
                         print('reward: ', reward)
 
@@ -315,18 +316,18 @@ class  Environment:
 
                 # 1episode内でdoneできなかったら罰を与える
                 if step == MAX_STEPS-1:
-                    reward = -1
+                    reward = -30
                     print('reward: ', reward)
                     complete_episodes = 0  # 連続で立ち続けた試行数をリセット
 
             if is_episode_final is True:
                 Brain(num_states=self.num_states, num_actions=self.num_actions).save_Q_table()  # Q-tableを保存する
-                images[0].save('final_episode.gif', save_all=True, append_images=images[1:], optimize=False, loop=1)
+                images[0].save('final_episode.gif', save_all=True, append_images=images[1:], optimize=False, loop=1, duration=1000) # 最終試行の映像を保存
                 print('finished')
                 break
 
-            if complete_episodes >= 10:  # 10回連続成功なら
-                print('10回連続成功\n次で最終試行')
+            if complete_episodes >= 20:  # 10回連続成功なら
+                print('20回連続成功\n次で最終試行')
                 is_episode_final = True  # 次の試行を最終試行とする
 
 # main
