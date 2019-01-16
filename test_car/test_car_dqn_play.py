@@ -13,7 +13,7 @@ class Test_car(gym.Env):
         print("init")
         super().__init__()
         self.episodes = 0
-        self.max_steps = 50
+        self.max_steps = 10
         self.height = 64
         self.width = 64
         self.action_space = spaces.Discrete(4) #前後左右
@@ -32,8 +32,6 @@ class Test_car(gym.Env):
         print("\n====episode:"+str(self.episodes)+"=================")
         self.episodes += 1
         self.steps = 0
-        targetX, targetY = np.random.permutation(np.arange(10))[0:2]
-        self.targetPos = [targetX, targetY, 0]
 
         '''pybullet側'''
         #bulletの世界をリセット
@@ -48,6 +46,8 @@ class Test_car(gym.Env):
         self.car = p.loadURDF("test_car.urdf", self.startPos, self.startOrientation)
 
         # ターゲットを表示
+        targetX, targetY = np.random.permutation(np.arange(10))[0:2]
+        self.targetPos = [targetX, targetY, 0]
         self.target = p.createCollisionShape(
             p.GEOM_CYLINDER, radius=0.2, height=2, collisionFramePosition=self.targetPos)
         p.createMultiBody(0, self.target)
@@ -85,7 +85,7 @@ class Test_car(gym.Env):
 
         for i in range(200):
             p.stepSimulation()
-            time.sleep(1./240.)
+            #time.sleep(1./240.)
 
         observation = self.observation()
         done = self.is_done()
@@ -99,9 +99,14 @@ class Test_car(gym.Env):
         if mode != "rgb_array":
             return np.array([])
         base_pos, orn = p.getBasePositionAndOrientation(self.car)
-        cam_eye = np.array(base_pos) + [0.1,0,0.2]
-        cam_target = np.array(base_pos) + [2,0,0.2]
-        cam_upvec = [1,0,1]
+        yaw = p.getEulerFromQuaternion(orn)[2] # z軸方向から見た本体の回転角度
+        rot_matrix = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]]) # 回転行列
+        target_relative_vec2D = np.array([2,0]) # 本体から見たtargetの相対位置
+        target_abs_vec2D = np.dot(rot_matrix, target_relative_vec2D) # targetの絶対位置
+
+        cam_eye = np.array(base_pos) + np.array([0,0,0.2])
+        cam_target = np.array(base_pos) + np.append(target_abs_vec2D, 0.2) # z=0.2は足()
+        cam_upvec = [0,0,1]
 
         view_matrix = p.computeViewMatrix(
                 cameraEyePosition=cam_eye,
@@ -181,50 +186,41 @@ class Test_car(gym.Env):
 
 env = Test_car()
 
-
-from keras.models import Sequential
-from keras.layers import InputLayer, Dense, Reshape, Conv2D, Flatten, MaxPooling2D, BatchNormalization, Dropout
-from keras.optimizers import Adam
-
-from rl.agents.dqn import DQNAgent
-from rl.policy import BoltzmannQPolicy
-from rl.memory import SequentialMemory
-
-nb_actions = 4
+#これらとpybulletのウィンドウ表示(p.connect)を分けないとカーネルが死ぬ
+from baselines import deepq
+import datetime
 
 
-model = Sequential()
+def callback(lcl, glb):
+    # stop training if reward exceeds 199
+    total = sum(lcl['episode_rewards'][-101:-1]) / 100
+    totalt = lcl['t']
+    is_solved = totalt > 2000 and total >= 20
+    return is_solved
+'''
+cnn_to_mlp(convs, hiddens, dueling=False, layer_norm=False)
+    - convs: [(int, int, int)]
+        list of convolutional layers in form of
+        (num_outputs, kernel_size, stride)
+    - hiddens: [int]
+        list of sizes of hidden layers
+'''
 
-model.add(Reshape((64, 64, 3), input_shape=(1,) + env.observation_space.shape))
-model.add(Conv2D(8, kernel_size=(5,5), activation='relu'))
-model.add(BatchNormalization())
-model.add(MaxPooling2D(pool_size=(2,2)))
-model.add(Conv2D(16, kernel_size=(5,5), activation='relu'))
-model.add(BatchNormalization())
-model.add(MaxPooling2D(pool_size=(2,2)))
-model.add(Conv2D(32, kernel_size=(5,5), activation='relu'))
-model.add(BatchNormalization())
-model.add(MaxPooling2D(pool_size=(2,2)))
-model.add(Flatten())
-model.add(Dense(256, activation='relu'))
-model.add(Dropout(0.25))
-model.add(Dense(64, activation='relu'))
-model.add(Dropout(0.5))
-model.add(Dense(nb_actions, activation='linear'))
-
-print(model.summary())
+model = deepq.models.cnn_to_mlp(convs=[(32, 8, 4), (64, 4, 2), (64, 3, 1)], hiddens=[256], dueling=False)
 
 
-memory = SequentialMemory(limit=100000, window_length=1)
-policy = BoltzmannQPolicy()
-dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=10,
-               target_model_update=1e-2, policy=policy)
-dqn.compile(Adam(lr=1e-3), metrics=['mae'])
+act = deepq.learn(
+    env,
+    q_func=model,
+    lr=1e-2,
+    max_timesteps=100000,
+    buffer_size=50000,
+    exploration_fraction=0.1,
+    exploration_final_eps=0.02,
+    print_freq=10,
+    callback=callback)
 
-dqn.fit(env, nb_steps=100000, visualize=True, verbose=0)
+print("Saving model to test_car_model.pkl")
+act.save("test_car_model.pkl")
 
-# After training is done, we save the final weights.
-dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v0"), overwrite=True)
-
-# Finally, evaluate our algorithm for 5 episodes.
-dqn.test(env, nb_episodes=5, visualize=True)
+p.disconnect()

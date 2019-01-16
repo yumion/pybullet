@@ -1,17 +1,30 @@
 # coding: utf-8
+<<<<<<< HEAD
+=======
+
+>>>>>>> test_car/resetSimulation
 import pybullet as p
 import time
 import pybullet_data
 
+<<<<<<< HEAD
 
 #ウインドウ表示
 p.connect(p.GUI) #or p.DIRECT for non-graphical version
 
+=======
+#ウインドウ表示
+p.connect(p.GUI) #or p.DIRECT for non-graphical version
+>>>>>>> test_car/resetSimulation
 #urdfファイルを読み込む時のパスを指定してあげる
 p.setAdditionalSearchPath(pybullet_data.getDataPath()) #optionally
 
 # 重力
 p.setGravity(0,0,-10)
+<<<<<<< HEAD
+=======
+
+>>>>>>> test_car/resetSimulation
 #フィールドを追加
 planeId = p.loadURDF("plane.urdf")
 
@@ -22,7 +35,12 @@ cubeStartOrientation = p.getQuaternionFromEuler([0,0,0])
 #オブジェクトを読み込み表示
 boxId = p.loadURDF("r2d2.urdf",cubeStartPos, cubeStartOrientation)
 
+<<<<<<< HEAD
 p.setAdditionalSearchPath("../../catkin_ws/src/simple_car/simple_car_description/urdf/")
+=======
+
+p.setAdditionalSearchPath("/home/dl-box/ros_ws/src/test_car_description/urdf/")
+>>>>>>> test_car/resetSimulation
 car = p.loadURDF("test_car.urdf",[1,0,0], cubeStartOrientation)
 
 #立方体を出現させる
@@ -77,7 +95,11 @@ p.resetSimulation()
 p.disconnect()
 
 
+<<<<<<< HEAD
 
+=======
+'''
+>>>>>>> test_car/resetSimulation
 #オブジェクトを複数表示
 import pybullet as p
 import time
@@ -94,7 +116,10 @@ mass = 1
 visualShapeId = -1
 
 
+<<<<<<< HEAD
 
+=======
+>>>>>>> test_car/resetSimulation
 link_Masses=[1]
 linkCollisionShapeIndices=[colBoxId]
 linkVisualShapeIndices=[-1]
@@ -133,3 +158,7 @@ while (1):
 	print(keys)
 
 	time.sleep(0.01)
+<<<<<<< HEAD
+=======
+'''
+>>>>>>> test_car/resetSimulation
