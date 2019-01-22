@@ -3,9 +3,13 @@ import numpy as np
 import cv2
 import time
 from datetime import datetime  # 時刻を取得
+from PIL import Image
+import os
+import copy
+import math
 import pybullet as p
 import pybullet_data
-from PIL import Image
+from pybullet_envs.bullet import racecar
 
 
 '''定数の設定'''
@@ -20,10 +24,11 @@ AREA_THRESH = 40  # 赤色物体面積の閾値．0~100で規格化してある
 # 使うq_tableのファイル名を"trained_q_table.npy"とすること
 TEST_MODE = False
 '''追加学習するときはTrue'''
-ADD_TRAIN_MODE = True
+ADD_TRAIN_MODE = False
 
 '''pybulletに描画するか'''
-RENDER = False
+RENDER = True
+
 
 class Agent:
     '''CartPoleのエージェントクラスです、棒付き台車そのものになります'''
@@ -104,11 +109,10 @@ class  Environment:
             p.connect(p.GUI)
         else:
             p.connect(p.DIRECT)
-        self.maxForce = 10
 
-    def renderPicture(self, height=320, width=320):
+    def renderPicture(self, uniqueId, height=320, width=320):
         '''bullet側からカメラ画像を取得'''
-        base_pos, orn = p.getBasePositionAndOrientation(self.car)
+        base_pos, orn = p.getBasePositionAndOrientation(uniqueId)
         yaw = p.getEulerFromQuaternion(orn)[2] # z軸方向から見た本体の回転角度
         rot_matrix = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]]) # 回転行列
         target_relative_vec2D = np.array([2,0]) # 本体から見たtargetの相対位置
@@ -172,19 +176,26 @@ class  Environment:
         self.planeId = p.loadURDF("plane100.urdf")
 
         #オブジェクトモデルを表示
-        p.setAdditionalSearchPath("../../catkin_ws/src/simple_car/simple_car_description/urdf/")
+        p.setAdditionalSearchPath(pybullet_data.getDataPath())
         self.startPos = [0,0,0]
         self.startOrientation = p.getQuaternionFromEuler([0,0,0])
-        self.car = p.loadURDF("test_car.urdf", self.startPos, self.startOrientation)
+        self.car = racecar.Racecar(p, pybullet_data.getDataPath())
+        # 摩擦係数を変更
+        p.changeDynamics(self.car.racecarUniqueId, 1, lateralFriction=10) # 前輪左
+        p.changeDynamics(self.car.racecarUniqueId, 3, lateralFriction=10) # 前輪右
+        p.changeDynamics(self.car.racecarUniqueId, 12, lateralFriction=10) # 後輪左
+        p.changeDynamics(self.car.racecarUniqueId, 14, lateralFriction=10) # 後輪右
         # ターゲットを表示
         targetX, targetY = np.random.permutation(np.arange(10))[0:2]
         self.targetPos = [targetX, targetY, 0]
         self.target = p.createCollisionShape(
             p.GEOM_CYLINDER, radius=0.5, height=2, collisionFramePosition=self.targetPos)
-        p.createMultiBody(0, self.target)
+        vis = p.createVisualShape(
+            p.GEOM_CYLINDER, radius=0.5, length=2, visualFramePosition=self.targetPos, rgbaColor=[0,255,0,1])
+        p.createMultiBody(0, self.target, vis)
 
         # 目標の面積, 重心の位置を取得する
-        frame = self.renderPicture()
+        frame = self.renderPicture(self.car.racecarUniqueId)
         _, area_sum = self.calc_area(frame)
         area_v = 0
 
@@ -195,7 +206,7 @@ class  Environment:
     def get_env(self, area_sum_before):
         '''環境を認識する'''
         '''カメラで写真をとりOpenCVで面積と重心を取得する'''
-        frame = self.renderPicture()
+        frame = self.renderPicture(self.car.racecarUniqueId)
         # 赤色の面積とその変化量, 重心の位置とその変化量を取得する
         _, area_sum = self.calc_area(frame)
         area_v = area_sum - area_sum_before
@@ -206,13 +217,14 @@ class  Environment:
     def act_env(self, observation, action):
         '''決定したactionに従って、ロボットハンドを動かす'''
         if action == 0:  # 前
-            self.go()
-        elif action == 1:  # 後
-            self.back()
-        elif action == 2:  # 右
-            self.right()
+            self.car.applyAction([1, 0])
+        elif action == 1:  # 右
+            self.car.applyAction([1, -0.6])
+        elif action == 2:  # 後
+            self.car.applyAction([-1, 0])
         elif action == 3:  # 左
-            self.left()
+            self.car.applyAction([1, 0.6])
+        print('action', action)
 
         for i in range(200):
             p.stepSimulation()
@@ -224,32 +236,6 @@ class  Environment:
         done = self.is_done(observation_next)
 
         return observation_next, done
-
-    def go(self):
-        p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[10,10,0,0],
-                forces=np.ones(4)*self.maxForce)
-    def back(self):
-        p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[-10,-10,0,0],
-                forces=np.ones(4)*self.maxForce)
-    def right(self):
-        p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[10,6,0,0],
-                forces=np.ones(4)*self.maxForce)
-    def left(self):
-        p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[6,10,0,0],
-                forces=np.ones(4)*self.maxForce)
-    def stop(self):
-        p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[0,0,0,0],
-                forces=np.ones(4)*self.maxForce)
 
     def is_done(self, observation):
         '''observationによって終了判定をする'''
@@ -277,7 +263,7 @@ class  Environment:
                 if RENDER:
                     print('Step: {0} of Episode: {1}'.format(step+1, episode))
                 # ロボット視点の映像を保存
-                frame = self.renderPicture()
+                frame = self.renderPicture(self.car.racecarUniqueId)
                 frame = Image.fromarray(frame)
                 images.append(frame)
                 # 行動を求める
