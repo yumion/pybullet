@@ -14,6 +14,7 @@ from pybullet_envs.bullet import racecar
 
 '''定数の設定'''
 NUM_DIZITIZED = 6  # 各状態の離散値への分割数
+NUM_ACTIONS = 5  # 行動の状態数
 discount = 0.99  # 時間割引率
 lr = 0.5  # 学習係数
 MAX_STEPS = 30  # 1試行のstep数cartpoleは195steps立ち続ければ終わり
@@ -24,7 +25,7 @@ AREA_THRESH = 40  # 赤色物体面積の閾値．0~100で規格化してある
 # 使うq_tableのファイル名を"trained_q_table.npy"とすること
 TEST_MODE = False
 '''追加学習するときはTrue'''
-ADD_TRAIN_MODE = False
+ADD_TRAIN_MODE = True
 
 '''pybulletに描画するか'''
 RENDER = True
@@ -102,7 +103,7 @@ class  Environment:
 
     def __init__(self):
         self.num_states = 2  # 課題の状態の数(面積と重心(x,y)と、それぞれの変化量で6つ)
-        self.num_actions = 4  # ロボットハンドの行動（前進，後退，右旋回，左旋回，握る，離す，止まる）
+        self.num_actions = NUM_ACTIONS  # ロボットハンドの行動（前進，後退，右旋回，左旋回，握る，離す，止まる）
         self.agent = Agent(self.num_states, self.num_actions)  # 環境内で行動するAgentを生成
         '''pybullet'''
         if RENDER:
@@ -177,8 +178,6 @@ class  Environment:
 
         #オブジェクトモデルを表示
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
-        self.startPos = [0,0,0]
-        self.startOrientation = p.getQuaternionFromEuler([0,0,0])
         self.car = racecar.Racecar(p, pybullet_data.getDataPath())
         # 摩擦係数を変更
         p.changeDynamics(self.car.racecarUniqueId, 1, lateralFriction=10) # 前輪左
@@ -224,6 +223,8 @@ class  Environment:
             self.car.applyAction([-1, 0])
         elif action == 3:  # 左
             self.car.applyAction([1, 0.6])
+        elif action == 4:  # 止まる
+            self.car.applyAction([0, 0])
         print('action', action)
 
         for i in range(200):
@@ -299,7 +300,7 @@ class  Environment:
 
                 # 1episode内でdoneできなかったら罰を与える
                 if step == MAX_STEPS-1:
-                    reward = -30
+                    reward = -50
                     print('\nreward: ', reward)
                     complete_episodes = 0  # 連続で立ち続けた試行数をリセット
 

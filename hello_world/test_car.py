@@ -9,8 +9,8 @@ import time
 physicsClient = p.connect(p.GUI)
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 p.setGravity(0,0,-10)
-# planeId = p.loadURDF("plane100.urdf")
-planeId = p.loadSDF('stadium.sdf')
+planeId = p.loadURDF("plane100.urdf")
+# planeId = p.loadSDF('stadium.sdf')
 
 p.setAdditionalSearchPath(pybullet_data.getDataPath())
 r2d2 = p.loadURDF("r2d2.urdf", [2,0,0.5])
@@ -38,14 +38,15 @@ base_pos, orn = p.getBasePositionAndOrientation(car)
 print(base_pos)
 
 # 物理パラメータ変更
-p.getNumJoints(racecar)
-p.getJointInfo(racecar, 2)
-p.getDynamicsInfo(racecar, 0)
+p.getNumJoints(racecar.racecarUniqueId)
+p.getJointInfo(racecar.racecarUniqueId, 0)
+p.getDynamicsInfo(racecar.racecarUniqueId, 0)
 # 摩擦係数を変更
 for joint in range(p.getNumJoints(car)):
     p.changeDynamics(car, joint, lateralFriction=10)
 p.changeDynamics(car, 1, lateralFriction=10)
 p.changeDynamics(car, 2, lateralFriction=10)
+p.changeDynamics(car, 0, mass=100)
 
 #オブジェクト視点カメラ
 cam_eye = np.array(base_pos) + [0.1,0,0.2]
@@ -133,7 +134,7 @@ for steer in [0,2]:
 racecar.applyAction([1,-0.6])
 
 #シミュレーション開始
-for i in range (10000):
+for i in range(5000):
     p.stepSimulation()
     # img, mask = render(car) #renderするととても遅くなる
     time.sleep(1./240.)#世界の時間スピード?
