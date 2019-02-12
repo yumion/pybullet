@@ -1,6 +1,9 @@
 # jupyter notebook
 .ipynb_checkpoints/
 
+# pyenv
+.python-version
+
 # MacOS
 .DS_Store
 
