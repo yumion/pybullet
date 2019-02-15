@@ -14,18 +14,18 @@ NUM_STATES = 6
 NUM_ACTIONS = 4
 discount = 0.99  # 時間割引率
 lr = 0.1  # 学習係数
-MAX_STEPS = 30  # 1試行のstep数
-NUM_EPISODES = 20000  # 最大試行回数
+MAX_STEPS = 50  # 1試行のstep数
+NUM_EPISODES = 100000  # 最大試行回数
 AREA_THRESH = 50  # 赤色物体面積の閾値．0~100で規格化してある
 
 '''学習するときはFalse，学習済みのモデルを使用するときはTrue'''
 # 使うq_tableのファイル名を"trained_q_table.npy"とすること
-TEST_MODE = True
+TEST_MODE = False
 '''追加学習するときはTrue'''
 ADD_TRAIN_MODE = False
 
 '''pybulletに描画するか'''
-RENDER = True
+RENDER = False
 
 class Agent:
     '''CartPoleのエージェントクラスです、棒付き台車そのものになります'''
@@ -282,6 +282,15 @@ class  Environment:
             print('Environment.run')
 
         for episode in range(NUM_EPISODES):  # 試行数分繰り返す
+            # test_intervalごとに性能をテスト
+            if episode == 0:
+                # はじめにtest log生成
+                with open('test_reward.csv', 'w') as f:
+                    f.write('mean,std\n')
+            elif episode % test_interval == 0 or TEST_MODE:
+                # 1episode以降はこっちに分岐
+                self.test(num_episodes=num_test)
+
             if not RENDER:
                 print('Episode:', episode)
             observation, frame = self.reset()  # 環境の初期化
@@ -313,20 +322,11 @@ class  Environment:
                     reward = -1
             print('\nreward: ', reward)
 
-            # test_intervalごとに性能をテスト
-            if episode == 0:
-                # はじめにtest log生成
-                with open('test_reward.csv', 'w') as f:
-                    f.write('episode,mean_reward,std_reward\n')
-            elif episode % test_interval == 0:
-                # 1episode以降はこっちに分岐
-                self.test(num_test)
-
-    def test(self, num_episodes=10):
+    def test(self, num_episodes):
         '''性能をテスト'''
-        print('-*- test mode -*-')
         test_reward = [] # test時の報酬を格納
         for episode in range(num_episodes):  # 試行数分繰り返す
+            print('-*- test mode -*-')
             print('Episode:', episode)
             images = [] # １試行の映像を格納
             observation, frame = self.reset()  # 環境の初期化
@@ -365,9 +365,29 @@ class  Environment:
         with open('test_reward.csv', 'a') as f:
             rew_mean = np.array(test_reward).mean() # エピソードで平均
             rew_std = np.array(test_reward).std() # 標準偏差
-            f.write(str(i)+','+str(rew_mean)+','+str(rew_std)+'\n')
+            f.write(str(rew_mean)+','+str(rew_std)+'\n')
+        # 最終エピソードの動き
+        images[0].save('final_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000)
 
 
 # main
 robot_hand_env = Environment()
 robot_hand_env.run(test_interval=10, num_test=10)
+
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+df = pd.read_csv('robot_hand_jst/test_reward.csv')
+
+reward = df['mean'].to_list()
+error = df['std'].to_list()
+episode = np.arange(1,len(reward)+1)
+
+plt.plot(episode, reward, 'bo')
+plt.errorbar(episode, reward, error, ecolor='green', fmt='ro')
+plt.xlim(0, episode[-1]+1)
+plt.ylim(-1.2, 1.2)
+plt.xlabel('episode')
+plt.ylabel('reward')
+plt.show()
