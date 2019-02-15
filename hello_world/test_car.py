@@ -153,8 +153,8 @@ base_pos, orn = p.getBasePositionAndOrientation(car)
 print(base_pos)
 print(p.getEulerFromQuaternion(orn))
 
-p.getClosestPoints(bodyA=car, bodyB=target, distance=100, linkIndexA=0)[0][8]
-p.getJointInfo(car,2)
+p.getClosestPoints(bodyA=car, bodyB=target_col, distance=1000)
+p.getJointInfo(racecar.racecarUniqueId,5)
 
 p.setJointMotorControlArray(
     car, np.arange(p.getNumJoints(car))[1:], p.VELOCITY_CONTROL,

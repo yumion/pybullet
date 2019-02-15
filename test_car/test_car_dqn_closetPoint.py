@@ -1,6 +1,4 @@
 # coding: utf-8
-
-
 import pybullet as p
 import time
 import numpy as np
@@ -9,11 +7,10 @@ from gym import spaces
 import cv2
 
 
-
 class Test_car(gym.Env):
 
     def __init__(self):
-        
+
         print("init")
         super().__init__()
         self.episodes = 0
