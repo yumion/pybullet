@@ -233,16 +233,8 @@ class  Environment:
 
     def act_env(self, observation, action):
         '''決定したactionに従って、ロボットハンドを動かす'''
-        if action == 0:  # 前
-            self.go()
-        elif action == 1:  # 後
-            self.back()
-        elif action == 2:  # 右
-            self.right()
-        elif action == 3:  # 左
-            self.left()
-
-        for i in range(200):
+        self.selectAction(action)
+        for i in range(100):
             p.stepSimulation()
             if RENDER:
                 time.sleep(1./240.)
@@ -253,31 +245,27 @@ class  Environment:
 
         return observation_next, done
 
-    def go(self):
-        p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[10,10,0,0],
-                forces=np.ones(4)*self.maxForce)
-    def back(self):
-        p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[-10,-10,0,0],
-                forces=np.ones(4)*self.maxForce)
-    def right(self):
-        p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[10,6,0,0],
-                forces=np.ones(4)*self.maxForce)
-    def left(self):
-        p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[6,10,0,0],
-                forces=np.ones(4)*self.maxForce)
-    def stop(self):
-        p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[0,0,0,0],
-                forces=np.ones(4)*self.maxForce)
+    def selectAction(self, action):
+        if action == 0:  # 前
+            p.setJointMotorControlArray(
+                    self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
+                    targetVelocities=[10,10,0,0],
+                    forces=np.ones(4)*self.maxForce)
+        elif action == 1:  # 後
+            p.setJointMotorControlArray(
+                    self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
+                    targetVelocities=[-10,-10,0,0],
+                    forces=np.ones(4)*self.maxForce)
+        elif action == 2:  # 右
+            p.setJointMotorControlArray(
+                    self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
+                    targetVelocities=[10,6,0,0],
+                    forces=np.ones(4)*self.maxForce)
+        elif action == 3:  # 左
+            p.setJointMotorControlArray(
+                    self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
+                    targetVelocities=[6,10,0,0],
+                    forces=np.ones(4)*self.maxForce)
 
     def is_done(self, observation):
         '''observationによって終了判定をする'''
@@ -288,17 +276,59 @@ class  Environment:
             done = True
         return done
 
-    def run(self):
+    def run(self, test_interval=10, num_test=10):
         '''実行'''
         if RENDER:
             print('Environment.run')
-        test_reward = [] # test時の報酬を格納
-        is_episode_final = False  # 最終試行フラグ
 
         for episode in range(NUM_EPISODES):  # 試行数分繰り返す
-            images = [] # １試行の映像を格納
             if not RENDER:
                 print('Episode:', episode)
+            observation, frame = self.reset()  # 環境の初期化
+
+            for step in range(MAX_STEPS):  # 1エピソードのループ
+                if RENDER:
+                    print('Step: {0} of Episode: {1}'.format(step+1, episode))
+                # 行動を求める
+                action = self.agent.get_action(observation, episode, test=False)
+                # 行動a_tの実行により、s_{t+1}, r_{t+1}を求める
+                observation_next, done = self.act_env(observation, action)
+                # 報酬を与える
+                if done:
+                    reward = 1  # 目標を掴んだら報酬1を与える
+                else:
+                    reward = 0 # 途中の報酬は0
+                    if RENDER:
+                        print('reward: ', reward)
+                # step+1の状態observation_nextを用いて,Q関数を更新する
+                self.agent.update_Q_function(observation, action, reward, observation_next)
+                # 観測の更新
+                observation = observation_next
+                # 終了時の処理
+                if done:
+                    print('{0} Episode: Finished after {1} time steps'.format(episode, step+1))
+                    break
+                # 1episode内でdoneできなかったら罰を与える
+                if (step+1) == MAX_STEPS:
+                    reward = -1
+            print('\nreward: ', reward)
+
+            # test_intervalごとに性能をテスト
+            if episode == 0:
+                # はじめにtest log生成
+                with open('test_reward.csv', 'w') as f:
+                    f.write('episode,mean_reward,std_reward\n')
+            elif episode % test_interval == 0:
+                # 1episode以降はこっちに分岐
+                self.test(num_test)
+
+    def test(self, num_episodes=10):
+        '''性能をテスト'''
+        print('-*- test mode -*-')
+        test_reward = [] # test時の報酬を格納
+        for episode in range(num_episodes):  # 試行数分繰り返す
+            print('Episode:', episode)
+            images = [] # １試行の映像を格納
             observation, frame = self.reset()  # 環境の初期化
 
             for step in range(MAX_STEPS):  # 1エピソードのループ
@@ -309,30 +339,19 @@ class  Environment:
                 frame = Image.fromarray(frame)
                 images.append(frame)
                 # 行動を求める
-                if episode % 10 == 0: # 10episodeに１回e-greedyを止めてQ値の最大値を使って行動
-                    print('-*- test mode -*-')
-                    action = self.agent.get_action(observation, episode, test=True)
-                else:
-                    action = self.agent.get_action(observation, episode, test=False)
+                action = self.agent.get_action(observation, episode, test=True)
                 # 行動a_tの実行により、s_{t+1}, r_{t+1}を求める
                 observation_next, done = self.act_env(observation, action)
-
                 # 報酬を与える
                 if done:
                     reward = 1  # 目標を掴んだら報酬1を与える
                     images[0].save('success_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000) #成功エピソードの映像を保存
                 else:
-                    reward = -0.001 # 途中の報酬は0
+                    reward = 0 # 途中の報酬は0
                     if RENDER:
                         print('reward: ', reward)
-
-                # step+1の状態observation_nextを用いて,Q関数を更新する
-                if episode % 10 != 0:
-                    self.agent.update_Q_function(observation, action, reward, observation_next)
-
                 # 観測の更新
                 observation = observation_next
-
                 # 終了時の処理
                 if done:
                     print('{0} Episode: Finished after {1} time steps'.format(episode, step+1))
@@ -340,30 +359,15 @@ class  Environment:
                 # 1episode内でdoneできなかったら罰を与える
                 if (step+1) == MAX_STEPS:
                     reward = -1
-
             print('\nreward: ', reward)
-            # 10の倍数のepisodeで性能をテスト
-            if episode % 10 == 0:
-                test_reward.append(reward)
-            # testの報酬のログをcsvで保存
-            with open('test_reward.csv', 'w') as f:
-                f.write('episode,reward\n')
-                for i, rew in enumerate(test_reward):
-                    f.write(str(i)+','+str(rew)+'\n')
-
-            if is_episode_final is True:
-                Brain(num_states=self.num_states, num_actions=self.num_actions).save_Q_table()  # Q-tableを保存する
-                images[0].save('final_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000) # 最終試行の映像を保存
-                print('finished')
-                break
-
-            mean_reward = np.array(test_reward)[-10:].mean()
-            if mean_reward > 0.9:  # テストの過去10episode以内で報酬の平均が0.9以上なら終了
-                print('last try')
-                is_episode_final = True  # 次の試行を最終試行とする
-
+            test_reward.append(reward)
+        # testの報酬のログをcsvで保存
+        with open('test_reward.csv', 'a') as f:
+            rew_mean = np.array(test_reward).mean() # エピソードで平均
+            rew_std = np.array(test_reward).std() # 標準偏差
+            f.write(str(i)+','+str(rew_mean)+','+str(rew_std)+'\n')
 
 
 # main
 robot_hand_env = Environment()
-robot_hand_env.run()
+robot_hand_env.run(test_interval=10, num_test=10)

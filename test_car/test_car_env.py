@@ -9,19 +9,21 @@ import cv2
 
 class Test_car(gym.Env):
 
-    def __init__(self, render=False, height=320, width=320, num_actions=4, num_states=3):
+    def __init__(self, render=False, height=320, width=320, time_steps=50, num_max_steps=100, num_actions=4, num_states=3):
         print("init")
         super().__init__()
-        self.rendering = render
         self.episodes = 0
-        self.max_steps = 30
-        self.height = height
-        self.width = width
+        '''gym側の初期設定'''
         self.action_space = spaces.Discrete(num_actions) #前後左右
         observation_high = np.ones(num_states) * 100  # 観測空間(state)の次元とそれらの最大値
         self.observation_space = spaces.Box(-observation_high, observation_high, dtype=np.float32) #Boxは連続値
         self.reward_range = [-1,1]
         '''pybullet側の初期設定'''
+        self.max_steps = num_max_steps
+        self.height = height
+        self.width = width
+        self.rendering = render
+        self.time_steps = time_steps
         if self.rendering:
             p.connect(p.GUI)
         else:
@@ -32,7 +34,7 @@ class Test_car(gym.Env):
         print("init_reset終了")
 
     def reset(self):
-
+        '''環境をリセット'''
         print("\n====episode:"+str(self.episodes)+"=================")
         self.episodes += 1
         self.steps = 0
@@ -45,12 +47,10 @@ class Test_car(gym.Env):
         #フィールドを表示
         p.setGravity(0,0,-10)
         self.plane = p.loadURDF("plane100.urdf")
-
         #オブジェクトモデルを表示
         self.startPos = [0,0,0]
         self.startOrientation = p.getQuaternionFromEuler([0,0,0])
         self.car = p.loadURDF("test_car.urdf", self.startPos, self.startOrientation)
-
         # ターゲットを表示
         self.target = p.createCollisionShape(
             p.GEOM_CYLINDER, radius=0.2, height=2, collisionFramePosition=self.targetPos)
@@ -61,10 +61,47 @@ class Test_car(gym.Env):
         return self.observation()
 
     def step(self, action):
-
+        '''time step'''
         if self.rendering:
             print("\n---step:"+str(self.steps)+"-------")
         self.steps += 1
+        # 行動を実行
+        self.selectAction(action)
+        for i in range(self.time_steps):
+            p.stepSimulation()
+            if self.rendering:
+                time.sleep(1./240.)
+        # 行動後の状態を観測
+        area_sum, center_x, center_y = self.observation()
+        reward, done = self.reward(area_sum, center_x, center_y)
+        return observation, reward, done, {}
+
+    def observation(self):
+        '''一人称視点で観測'''
+        rgb_array = self.render()
+        # 面積
+        area_sum = self.calc_area(rgb_array)
+        # 重心
+        center_x, center_y = self.calc_center(rgb_array)
+        return area_sum, center_x, center_y
+
+    def reward(self, area_sum, center_x, center_y):
+        '''報酬'''
+        if area_sum >= 50 and center_x >=140 and center_x <= 180:
+            reward = 1
+            done = True
+            print("reward: ", reward)
+        elif self.steps == self.max_steps-5:
+            reward = -1
+            done = True
+            print("reward: ", reward)
+        else:
+            reward = 0
+            done = False
+        return reward, done
+
+    def selectAction(self, aciton):
+        '''行動を選択'''
         if action == 0:
             #前進
             p.setJointMotorControlArray(
@@ -90,20 +127,8 @@ class Test_car(gym.Env):
                 targetVelocities=[6,10,6,10],
                 forces=np.ones(4)*self.maxForce)
 
-        for i in range(200):
-            p.stepSimulation()
-            if self.rendering:
-                time.sleep(1./240.)
-
-        observation = self.observation()
-        done = self.is_done()
-        reward = self.reward()
-
-        return observation, reward, done, {}
-
-
     def render(self, mode='rgb_array', close=False):
-
+        '''レンダリング'''
         if mode != "rgb_array":
             return np.array([])
         base_pos, orn = p.getBasePositionAndOrientation(self.car)
@@ -135,21 +160,6 @@ class Test_car(gym.Env):
 
         return rgb_array
 
-    def close(self):
-        pass
-
-    def seed(self, seed=None):
-        pass
-
-    def observation(self):
-        '''観測'''
-        rgb_array = self.render()
-        # 面積
-        area_sum = self.calc_area(rgb_array)
-        # 重心
-        center_x, center_y = self.calc_center(rgb_array)
-        return area_sum, center_x, center_y
-
     def green_detect(self, img):
         '''緑色のマスク'''
         # HSV色空間に変換
@@ -178,26 +188,8 @@ class Test_car(gym.Env):
         x, y = int(mu["m10"] / (mu["m00"] + 1e-7)), int(mu["m01"] / (mu["m00"] + 1e-7))
         return x, y
 
-    def is_done(self):
+    def close(self):
+        pass
 
-        frame = self.render()
-        self.area = self.calc_area(frame)
-        if self.area >= 50:
-            done = True
-        elif self.steps > self.max_steps:
-            done = True
-        else:
-            done = False
-        return done
-
-    def reward(self):
-
-        if self.area >= 50:
-            reward = 1
-            print("reward: ", reward)
-        elif self.steps > self.max_steps:
-            reward = -1
-            print("reward: ", reward)
-        else:
-            reward = 0
-        return reward
+    def seed(self, seed=None):
+        pass

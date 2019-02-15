@@ -122,6 +122,17 @@ img, mask = render(racecar.racecarUniqueId)
 # plt.imshow(mask, cmap="gray")
 plt.imshow(img)
 
+def calc_center(self, img):
+    '''重心座標(x,y)を求める'''
+    img = self.green_detect(img)
+    mu = cv2.moments(img, False)
+    x, y = int(mu["m10"] / (mu["m00"] + 1e-7)), int(mu["m01"] / (mu["m00"] + 1e-7))
+    # 重心を丸でくくる
+    #cv2.circle(img, (x, y), 4, 100, 2, 4)
+    print('x',x,'y',y)
+    return x, y
+
+
 #モーターを動かす
 maxForce = 20
 velocity = 20
