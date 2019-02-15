@@ -1,5 +1,6 @@
 # coding: utf-8
 import pybullet as p
+import pybullet_data
 import time
 import numpy as np
 import gym
@@ -28,7 +29,6 @@ class Test_car(gym.Env):
             p.connect(p.GUI)
         else:
             p.connect(p.DIRECT)
-        p.setAdditionalSearchPath("../../catkin_ws/src/simple_car/simple_car_description/urdf/")
         self.maxForce = 10
         self.reset()
         # print("init_reset終了")
@@ -46,17 +46,19 @@ class Test_car(gym.Env):
         p.resetSimulation()
         #フィールドを表示
         p.setGravity(0,0,-10)
+        p.setAdditionalSearchPath(pybullet_data.getDataPath())
         self.plane = p.loadURDF("plane100.urdf")
         #オブジェクトモデルを表示
         self.startPos = [0,0,0]
         self.startOrientation = p.getQuaternionFromEuler([0,0,0])
+        p.setAdditionalSearchPath("../../catkin_ws/src/simple_car/simple_car_description/urdf/")
         self.car = p.loadURDF("test_car.urdf", self.startPos, self.startOrientation)
         # ターゲットを表示
         self.target = p.createCollisionShape(
             p.GEOM_CYLINDER, radius=0.2, height=2, collisionFramePosition=self.targetPos)
         vis = p.createVisualShape(
             p.GEOM_CYLINDER, radius=0.2, length=2, visualFramePosition=self.targetPos, rgbaColor=[0,255,0,1])
-        p.createMultiBody(0, self.target, vis)
+        p.createMultiBody(0, self.target)
 
         return self.observation()
 
