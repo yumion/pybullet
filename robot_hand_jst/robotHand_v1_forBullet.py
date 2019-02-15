@@ -20,7 +20,7 @@ AREA_THRESH = 50  # 赤色物体面積の閾値．0~100で規格化してある
 
 '''学習するときはFalse，学習済みのモデルを使用するときはTrue'''
 # 使うq_tableのファイル名を"trained_q_table.npy"とすること
-TEST_MODE = False
+TEST_MODE = True
 '''追加学習するときはTrue'''
 ADD_TRAIN_MODE = False
 
@@ -40,7 +40,7 @@ class Agent:
     def get_action(self, observation, step, test=False):
         '''行動の決定'''
         action = self.brain.decide_action(observation, step, test)
-        print('action: ', action)
+        if RENDER: print('action: ', action)
         return action
 
 

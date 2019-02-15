@@ -9,20 +9,20 @@ import cv2
 
 class Test_car(gym.Env):
 
-    def __init__(self, render=False, height=64, width=64, num_actions=4, num_states=3):
+    def __init__(self, render=False, height=320, width=320, num_actions=4, num_states=3):
         print("init")
         super().__init__()
-        self.render = render
+        self.rendering = render
         self.episodes = 0
         self.max_steps = 30
         self.height = height
         self.width = width
-        self.action_space = spaces.Discrete(num_actions) # 行動空間。前後左右
+        self.action_space = spaces.Discrete(num_actions) #前後左右
         observation_high = np.ones(num_states) * 100  # 観測空間(state)の次元とそれらの最大値
         self.observation_space = spaces.Box(-observation_high, observation_high, dtype=np.float32) #Boxは連続値
         self.reward_range = [-1,1]
         '''pybullet側の初期設定'''
-        if self.render:
+        if self.rendering:
             p.connect(p.GUI)
         else:
             p.connect(p.DIRECT)
@@ -62,7 +62,7 @@ class Test_car(gym.Env):
 
     def step(self, action):
 
-        if self.render:
+        if self.rendering:
             print("\n---step:"+str(self.steps)+"-------")
         self.steps += 1
         if action == 0:
@@ -92,7 +92,7 @@ class Test_car(gym.Env):
 
         for i in range(200):
             p.stepSimulation()
-            if self.render:
+            if self.rendering:
                 time.sleep(1./240.)
 
         observation = self.observation()
@@ -102,7 +102,7 @@ class Test_car(gym.Env):
         return observation, reward, done, {}
 
 
-    def render(self, mode='rgb_array'):
+    def render(self, mode='rgb_array', close=False):
 
         if mode != "rgb_array":
             return np.array([])
@@ -144,19 +144,11 @@ class Test_car(gym.Env):
     def observation(self):
         '''観測'''
         rgb_array = self.render()
-        mask = self.green_detect(rgb_array)
         # 面積
-        area_sum = self.calc_area(mask)
+        area_sum = self.calc_area(rgb_array)
         # 重心
-        center_x, center_y = self.calc_center(mask)
+        center_x, center_y = self.calc_center(rgb_array)
         return area_sum, center_x, center_y
-
-    def calc_center(self, img):
-        '''重心座標(x,y)を求める'''
-        img = self.green_detect(img)
-        mu = cv2.moments(img, False)
-        x, y = int(mu["m10"] / (mu["m00"] + 1e-7)), int(mu["m01"] / (mu["m00"] + 1e-7))
-        return x, y
 
     def green_detect(self, img):
         '''緑色のマスク'''
@@ -175,15 +167,22 @@ class Test_car(gym.Env):
         # パーセントを算出
         h, w = img.shape  # frameの面積
         per = round(100 * float(pix_area) / (w * h), 3)  # 0-100で規格化
-        if self.render:
+        if self.rendering:
             print('GREEN_AREA: ', per)
         return per
+
+    def calc_center(self, img):
+        '''重心座標(x,y)を求める'''
+        img = self.green_detect(img)
+        mu = cv2.moments(img, False)
+        x, y = int(mu["m10"] / (mu["m00"] + 1e-7)), int(mu["m01"] / (mu["m00"] + 1e-7))
+        return x, y
 
     def is_done(self):
 
         frame = self.render()
         self.area = self.calc_area(frame)
-        if self.area >= 60:
+        if self.area >= 50:
             done = True
         elif self.steps > self.max_steps:
             done = True
@@ -193,11 +192,12 @@ class Test_car(gym.Env):
 
     def reward(self):
 
-        if self.area >= 60:
+        if self.area >= 50:
             reward = 1
+            print("reward: ", reward)
         elif self.steps > self.max_steps:
             reward = -1
+            print("reward: ", reward)
         else:
             reward = 0
-        print("reward: ", reward)
         return reward
