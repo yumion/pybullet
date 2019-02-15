@@ -1,8 +1,6 @@
 # coding: utf-8
-# import os
-# os.chdir('test_car/')
 from test_car_env import Test_car
-env = Test_car(render=False, steps=100) # この位置じゃないと謎エラー出る
+env = Test_car(render=False, time_steps=100, num_max_steps=50) # この位置じゃないとエラー出る
 
 from keras.models import Sequential
 from keras.layers import Dense, Flatten, Dropout
@@ -19,14 +17,14 @@ model.add(Dense(64, activation='relu'))
 model.add(Dense(nb_actions, activation='relu'))
 # print(model.summary())
 
-memory = SequentialMemory(limit=100000, window_length=1)
+memory = SequentialMemory(limit=10000, window_length=1)
 policy = EpsGreedyQPolicy(eps=0.1)
-dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=100, target_model_update=1e-2, policy=policy)
+dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=10, target_model_update=1e-2, policy=policy)
 dqn.compile(RMSprop(), metrics=['mae'])
 # print(dqn.get_config())
 
-import rl.callbacks
-class EpisodeLogger(rl.callbacks.Callback):
+from rl.callbacks import Callback
+class EpisodeLogger(Callback):
     def __init__(self):
         self.observations = {}
         self.rewards = {}
@@ -46,7 +44,8 @@ class EpisodeLogger(rl.callbacks.Callback):
 cb_ep = EpisodeLogger()
 callbacks = [cb_ep]
 
-history = dqn.fit(env, nb_steps=1000000, nb_max_episode_steps=100, callbacks=callbacks, verbose=1)
+history = dqn.fit(env, nb_steps=1000000, nb_max_episode_steps=50, callbacks=callbacks, verbose=1)
+
 
 # After training is done, we save the final weights.
 dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v0"), overwrite=True)

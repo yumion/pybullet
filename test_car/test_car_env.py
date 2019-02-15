@@ -10,7 +10,7 @@ import cv2
 class Test_car(gym.Env):
 
     def __init__(self, render=False, height=320, width=320, time_steps=50, num_max_steps=100, num_actions=4, num_states=3):
-        print("init")
+        # print("init")
         super().__init__()
         self.episodes = 0
         '''gym側の初期設定'''
@@ -31,7 +31,7 @@ class Test_car(gym.Env):
         p.setAdditionalSearchPath("../../catkin_ws/src/simple_car/simple_car_description/urdf/")
         self.maxForce = 10
         self.reset()
-        print("init_reset終了")
+        # print("init_reset終了")
 
     def reset(self):
         '''環境をリセット'''
@@ -74,6 +74,7 @@ class Test_car(gym.Env):
         # 行動後の状態を観測
         area_sum, center_x, center_y = self.observation()
         reward, done = self.reward(area_sum, center_x, center_y)
+        observation = area_sum, center_x, center_y
         return observation, reward, done, {}
 
     def observation(self):
@@ -90,17 +91,17 @@ class Test_car(gym.Env):
         if area_sum >= 50 and center_x >=140 and center_x <= 180:
             reward = 1
             done = True
-            print("reward: ", reward)
-        elif self.steps == self.max_steps-5:
+            print(" reward: ", reward)
+        elif self.steps+1 == self.max_steps:
             reward = -1
             done = True
-            print("reward: ", reward)
+            print(" reward: ", reward)
         else:
-            reward = 0
+            reward = -0.001
             done = False
         return reward, done
 
-    def selectAction(self, aciton):
+    def selectAction(self, action):
         '''行動を選択'''
         if action == 0:
             #前進
