@@ -1,4 +1,6 @@
 # coding: utf-8
+import os
+os.chdir('test_car/')
 from test_car_env import Test_car
 env = Test_car(render=False, time_steps=100, num_max_steps=50) # この位置じゃないとエラー出る
 
@@ -46,7 +48,15 @@ callbacks = [cb_ep]
 
 history = dqn.fit(env, nb_steps=1000000, nb_max_episode_steps=50, callbacks=callbacks, verbose=1)
 
+history.history
 
+import matplotlib.pyplot as plt
+cb_ep.observations
+
+for obs in cb_ep.observations.values():
+    plt.plot([o[0] for o in obs])
+plt.xlabel("step")
+plt.ylabel("pos")
 # After training is done, we save the final weights.
 dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v0"), overwrite=True)
 # save reward

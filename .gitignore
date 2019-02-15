@@ -9,3 +9,6 @@
 
 # model's weight (too heavy)
 *.pkl
+
+# log
+*.csv
