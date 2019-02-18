@@ -10,7 +10,7 @@ import cv2
 
 class Test_car(gym.Env):
 
-    def __init__(self, render=False, height=320, width=320, time_steps=50, num_max_steps=100, num_actions=4, num_states=4):
+    def __init__(self, render=False, height=320, width=320, time_steps=100, num_max_steps=50, num_actions=4, num_states=3):
         # print("init")
         super().__init__()
         self.episodes = 0
@@ -38,7 +38,7 @@ class Test_car(gym.Env):
         print("\n====episode:"+str(self.episodes)+"=================")
         self.episodes += 1
         self.steps = 0
-        targetX, targetY = np.random.permutation(np.arange(10))[0:2]
+        targetX, targetY = np.random.permutation(np.arange(-5,5))[0:2]
         self.targetPos = [targetX, targetY, 0]
 
         '''pybullet側'''
@@ -74,9 +74,9 @@ class Test_car(gym.Env):
             if self.rendering:
                 time.sleep(1./240.)
         # 行動後の状態を観測
-        area_sum, center_x, center_y, distance = self.observation()
-        reward, done = self.reward(area_sum, center_x, center_y, distance)
-        observation = area_sum, center_x, center_y, distance
+        area_sum, center_x, center_y = self.observation()
+        reward, done = self.reward(area_sum, center_x, center_y)
+        observation = area_sum, center_x, center_y
         return observation, reward, done, {}
 
     def observation(self):
@@ -86,13 +86,11 @@ class Test_car(gym.Env):
         area_sum = self.calc_area(rgb_array)
         # 重心
         center_x, center_y = self.calc_center(rgb_array)
-        # 距離
-        distance = p.getClosestPoints(bodyA=self.car, bodyB=self.target, distance=1000)[0][8]
-        return area_sum, center_x, center_y, distance
+        return area_sum, center_x, center_y
 
-    def reward(self, area_sum, center_x, center_y, distance):
+    def reward(self, area_sum, center_x, center_y):
         '''報酬'''
-        if distance <= 0:
+        if area_sum >= 50 and center_x >=140 and center_x <= 180:
             reward = 1
             done = True
             print(" reward: ", reward)
@@ -101,7 +99,7 @@ class Test_car(gym.Env):
             done = True
             print(" reward: ", reward)
         else:
-            reward = -distance
+            reward = -0.001
             done = False
         return reward, done
 
@@ -114,16 +112,16 @@ class Test_car(gym.Env):
                 targetVelocities=[10,10,10,10],
                 forces=np.ones(4)*self.maxForce)
         elif action == 1:
-            #右
-            p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[10,6,10,6],
-                forces=np.ones(4)*self.maxForce)
-        elif action == 2:
             #後退
             p.setJointMotorControlArray(
                 self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
                 targetVelocities=[-10,-10,-10,-10],
+                forces=np.ones(4)*self.maxForce)
+        elif action == 2:
+            #右
+            p.setJointMotorControlArray(
+                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
+                targetVelocities=[10,6,10,6],
                 forces=np.ones(4)*self.maxForce)
         elif action == 3:
             #左
@@ -131,6 +129,7 @@ class Test_car(gym.Env):
                 self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
                 targetVelocities=[6,10,6,10],
                 forces=np.ones(4)*self.maxForce)
+
 
     def render(self, mode='rgb_array', close=False):
         '''レンダリング'''

@@ -50,16 +50,17 @@ callbacks = [cb_ep]
 
 history = dqn.fit(env, nb_steps=1000000, nb_max_episode_steps=50, callbacks=callbacks, verbose=2)
 
-
-for obs in cb_ep.rewards.values():
-    plt.plot([o[0] for o in obs])
-plt.xlabel("steps")
-plt.ylabel("rewards")
-plt.show()
 # After training is done, we save the final weights.
 dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v0"), overwrite=True)
+
 # save reward
 with open('results_test_car_v1.csv', 'w') as f:
     f.write('episode,reward\n')
     for i, rew in enumerate(history.history['episode_reward']):
         f.write(str(i)+','+str(rew)+'\n')
+
+for obs in cb_ep.rewards.values():
+    plt.plot([o for o in obs])
+plt.xlabel("steps")
+plt.ylabel("rewards")
+plt.show()
