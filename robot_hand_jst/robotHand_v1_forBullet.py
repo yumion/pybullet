@@ -20,12 +20,12 @@ AREA_THRESH = 50  # 赤色物体面積の閾値．0~100で規格化してある
 
 '''学習するときはFalse，学習済みのモデルを使用するときはTrue'''
 # 使うq_tableのファイル名を"trained_q_table.npy"とすること
-TEST_MODE = False
+TEST_MODE = True
 '''追加学習するときはTrue'''
 ADD_TRAIN_MODE = False
 
 '''pybulletに描画するか'''
-RENDER = False
+RENDER = True
 
 class Agent:
     '''CartPoleのエージェントクラスです、棒付き台車そのものになります'''
@@ -378,16 +378,16 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-df = pd.read_csv('robot_hand_jst/test_reward.csv')
-
+df = pd.read_csv('test_reward.csv')
 reward = df['mean'].to_list()
 error = df['std'].to_list()
-episode = np.arange(1,len(reward)+1)
+episode = np.arange(0,len(reward)*10,10)
 
-plt.plot(episode, reward, 'bo')
-plt.errorbar(episode, reward, error, ecolor='green', fmt='ro')
-plt.xlim(0, episode[-1]+1)
+plt.plot(episode, reward, 'b.')
+plt.errorbar(episode, reward, error, ecolor='green', fmt='b.', alpha=0.2)
+plt.xlim(-100, episode[-1]+100)
 plt.ylim(-1.2, 1.2)
 plt.xlabel('episode')
 plt.ylabel('reward')
+plt.savefig('QL_results.png')
 plt.show()

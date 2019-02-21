@@ -99,7 +99,7 @@ class Test_car(gym.Env):
             done = True
             print(" reward: ", reward)
         else:
-            reward = -0.001
+            reward = 0
             done = False
         return reward, done
 
