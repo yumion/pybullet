@@ -34,9 +34,13 @@ target_vis = p.createVisualShape(p.GEOM_CYLINDER, radius=0.2, length=2, visualFr
 mass= 0 #static box
 p.createMultiBody(mass, target_col, target_vis)
 
-base_pos, orn = p.getBasePositionAndOrientation(car)
+base_pos, orn = p.getBasePositionAndOrientation(racecar.racecarUniqueId)
 print(base_pos)
-
+orn
+p.invertTransform(base_pos, orn)
+r2d2_pos, r2d2_orn = p.getBasePositionAndOrientation(r2d2)
+r2d2_pos
+p.multiplyTransforms(base_pos, orn, r2d2_pos, r2d2_orn)
 # 物理パラメータ変更
 p.getNumJoints(racecar.racecarUniqueId)
 p.getJointInfo(racecar.racecarUniqueId, 0)

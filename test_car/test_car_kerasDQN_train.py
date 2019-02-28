@@ -27,18 +27,27 @@ policy = BoltzmannQPolicy()
 dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=10, target_model_update=1e-2, policy=policy)
 dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 # print(dqn.get_config())
-history = dqn.fit(env, nb_steps=2000000, nb_max_episode_steps=50,  verbose=2)
+history = dqn.fit(env, nb_steps=2000000, nb_max_episode_steps=51,  verbose=2)
 
 # After training is done, we save the final weights.
-dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v0"), overwrite=True)
+dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v1"), overwrite=True)
 
 # save reward
-with open('results_test_car_v0.csv', 'w') as f:
+with open('results_test_car_v1.csv', 'w') as f:
     f.write('episode,reward\n')
     for i, rew in enumerate(history.history['episode_reward']):
         f.write(str(i)+','+str(rew)+'\n')
 
-plt.plot(np.arange(len(history.history['episode_reward'])), history.history['episode_reward'], '.')
+# show episode reward
+import matplotlib.pyplot as plt
+import pandas as pd
+import numpy as np
+
+df = pd.read_csv('results_test_car_v1.csv')
+reward = df['reward'].to_list()
+episode = df['episode'].to_list()
+
+plt.plot(episode, reward, '.')
 plt.xlabel("episode")
 plt.ylabel("rewards")
 plt.show()

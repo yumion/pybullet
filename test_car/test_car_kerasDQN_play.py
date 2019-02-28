@@ -26,7 +26,7 @@ policy = BoltzmannQPolicy()
 dqn = DQNAgent(model=model, nb_actions=nb_actions, memory=memory, nb_steps_warmup=10, target_model_update=1e-2, policy=policy)
 dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 
-dqn.load_weights('dqn_{}_weights.h5f'.format("test_car-v0"))
+dqn.load_weights('dqn_{}_weights.h5f'.format("test_car-v1"))
 
 # Finally, evaluate our algorithm for 5 episodes.
 dqn.test(env, nb_episodes=5, nb_max_episode_steps=50, visualize=True)

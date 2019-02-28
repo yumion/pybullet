@@ -10,14 +10,15 @@ import cv2
 
 class Test_car(gym.Env):
 
-    def __init__(self, render=False, height=320, width=320, time_steps=100, num_max_steps=50, num_actions=4, num_states=3):
+    def __init__(self, render=False, height=320, width=320, time_steps=50, num_max_steps=100, num_actions=4, num_states=3):
         # print("init")
         super().__init__()
         self.episodes = 0
         '''gym側の初期設定'''
-        self.action_space = spaces.Discrete(num_actions) #前後左右
-        observation_high = np.ones(num_states) * 100  # 観測空間(state)の次元とそれらの最大値
-        self.observation_space = spaces.Box(-observation_high, observation_high, dtype=np.float32) #Boxは連続値
+        action_high = np.ones(num_actions)*20 # 前輪後輪それぞれの速度をactionとする
+        self.action_space = spaces.Box(-action_high, action_high, dtype=np.float32)
+        observation_high = np.ones(num_states)*100  # 観測空間(state)の次元とそれらの最大値
+        self.observation_space = spaces.Box(-observation_high, observation_high, dtype=np.float32) # Boxは連続値
         self.reward_range = [-1,1]
         '''pybullet側の初期設定'''
         self.max_steps = num_max_steps
@@ -68,7 +69,7 @@ class Test_car(gym.Env):
             print("\n---step:"+str(self.steps)+"-------")
         self.steps += 1
         # 行動を実行
-        self.selectAction(action)
+        self.decideAction(action)
         for i in range(self.time_steps):
             p.stepSimulation()
             if self.rendering:
@@ -90,7 +91,7 @@ class Test_car(gym.Env):
 
     def reward(self, area_sum, center_x, center_y):
         '''報酬'''
-        if area_sum >= 50 and center_x >=140 and center_x <= 180:
+        if area_sum >= 60 and center_x >=140 and center_x <= 180:
             reward = 1
             done = True
             print(" reward: ", reward)
@@ -99,36 +100,16 @@ class Test_car(gym.Env):
             done = True
             print(" reward: ", reward)
         else:
-            reward = area_sum/100
+            reward = 0
             done = False
         return reward, done
 
-    def selectAction(self, action):
+    def decideAction(self, action):
         '''行動を選択'''
-        if action == 0:
-            #前進
-            p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[10,10,10,10],
-                forces=np.ones(4)*self.maxForce)
-        elif action == 1:
-            #後退
-            p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[-10,-10,-10,-10],
-                forces=np.ones(4)*self.maxForce)
-        elif action == 2:
-            #右
-            p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[10,6,10,6],
-                forces=np.ones(4)*self.maxForce)
-        elif action == 3:
-            #左
-            p.setJointMotorControlArray(
-                self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                targetVelocities=[6,10,6,10],
-                forces=np.ones(4)*self.maxForce)
+        p.setJointMotorControlArray(
+            self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
+            targetVelocities=action,
+            forces=np.ones(4)*self.maxForce)
 
 
     def render(self, mode='rgb_array', close=False):
