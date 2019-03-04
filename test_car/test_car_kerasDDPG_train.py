@@ -66,7 +66,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-df = pd.read_csv('test_car/results_test_car_v0_ddpg.csv')
+df = pd.read_csv('results_test_car_v0_ddpg.csv')
 reward = df['reward'].to_list()
 episode = df['episode'].to_list()
 

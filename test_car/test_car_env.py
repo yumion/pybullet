@@ -18,7 +18,6 @@ class Test_car(gym.Env):
         self.action_space = spaces.Discrete(num_actions) #前後左右
         observation_high = np.ones(num_states) * 100  # 観測空間(state)の次元とそれらの最大値
         self.observation_space = spaces.Box(-observation_high, observation_high, dtype=np.float32) #Boxは連続値
-        self.reward_range = [-1,1]
         '''pybullet側の初期設定'''
         self.max_steps = num_max_steps
         self.height = height
@@ -75,8 +74,9 @@ class Test_car(gym.Env):
                 time.sleep(1./240.)
         # 行動後の状態を観測
         area_sum, center_x, center_y = self.observation()
-        reward, done = self.reward(area_sum, center_x, center_y)
-        observation = area_sum, center_x, center_y
+        reward = area_sum / 100
+        done = self.is_done(area_sum, center_x)
+        observation = (area_sum, center_x, center_y)
         return observation, reward, done, {}
 
     def observation(self):
@@ -88,20 +88,15 @@ class Test_car(gym.Env):
         center_x, center_y = self.calc_center(rgb_array)
         return area_sum, center_x, center_y
 
-    def reward(self, area_sum, center_x, center_y):
-        '''報酬'''
+    def is_done(self, area_sum, center_x):
+        '''終了判定'''
         if area_sum >= 50 and center_x >=140 and center_x <= 180:
-            reward = 1
             done = True
-            print(" reward: ", reward)
         elif self.steps+1 == self.max_steps:
-            reward = -1
             done = True
-            print(" reward: ", reward)
         else:
-            reward = area_sum/100
             done = False
-        return reward, done
+        return done
 
     def selectAction(self, action):
         '''行動を選択'''

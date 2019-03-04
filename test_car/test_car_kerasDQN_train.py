@@ -30,10 +30,10 @@ dqn.compile(Adam(lr=1e-3), metrics=['mae'])
 history = dqn.fit(env, nb_steps=2000000, nb_max_episode_steps=51,  verbose=2)
 
 # After training is done, we save the final weights.
-dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v1"), overwrite=True)
+dqn.save_weights('dqn_{}_weights.h5f'.format("test_car-v2"), overwrite=True)
 
 # save reward
-with open('results_test_car_v1.csv', 'w') as f:
+with open('results_test_car_v2.csv', 'w') as f:
     f.write('episode,reward\n')
     for i, rew in enumerate(history.history['episode_reward']):
         f.write(str(i)+','+str(rew)+'\n')
@@ -43,7 +43,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 
-df = pd.read_csv('results_test_car_v1.csv')
+df = pd.read_csv('results_test_car_v2.csv')
 reward = df['reward'].to_list()
 episode = df['episode'].to_list()
 
