@@ -74,7 +74,7 @@ class Test_car(gym.Env):
                 time.sleep(1./240.)
         # 行動後の状態を観測
         area_sum, center_x, center_y = self.observation()
-        reward = area_sum / 100
+        reward = area_sum / 100 - 1/160 * abs(center_x-160) + 1
         done = self.is_done(area_sum, center_x)
         observation = (area_sum / 100, center_x / self.width, center_y / self.height)
         return observation, reward, done, {}
