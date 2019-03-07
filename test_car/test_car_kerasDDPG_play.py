@@ -50,8 +50,6 @@ def build_agent(num_action, observation_shape):
 
 agent = build_agent(env.action_space.shape[0], env.observation_space.shape)
 agent.compile(optimizer="nadam", metrics=["mae"])
-history = agent.fit(env, nb_steps=5000000,  verbose=2, nb_max_episode_steps=500)
-
 agent.load_weights('ddpg_{}_weights.h5f'.format("test_car-v0"))
 
 # Finally, evaluate our algorithm for 5 episodes.

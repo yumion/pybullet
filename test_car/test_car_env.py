@@ -76,7 +76,7 @@ class Test_car(gym.Env):
         area_sum, center_x, center_y = self.observation()
         reward = area_sum / 100
         done = self.is_done(area_sum, center_x)
-        observation = (area_sum, center_x, center_y)
+        observation = (area_sum / 100, center_x / self.width, center_y / self.height)
         return observation, reward, done, {}
 
     def observation(self):

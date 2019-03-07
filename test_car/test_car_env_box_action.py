@@ -76,7 +76,8 @@ class Test_car(gym.Env):
                 time.sleep(1./240.)
         # 行動後の状態を観測
         area_sum, center_x, center_y = self.observation()
-        reward, done = self.reward(area_sum, center_x, center_y)
+        reward = area_sum / 100
+        done = self.is_done(area_sum, center_x)
         observation = area_sum, center_x, center_y
         return observation, reward, done, {}
 
@@ -89,20 +90,17 @@ class Test_car(gym.Env):
         center_x, center_y = self.calc_center(rgb_array)
         return area_sum, center_x, center_y
 
-    def reward(self, area_sum, center_x, center_y):
-        '''報酬'''
-        if area_sum >= 60 and center_x >=140 and center_x <= 180:
-            reward = 1
+    def is_done(self, area_sum, center_x):
+        '''終了判定'''
+        if area_sum >= 50 and center_x >=140 and center_x <= 180:
             done = True
             print(" reward: ", reward)
         elif self.steps+1 == self.max_steps:
-            reward = -1
             done = True
             print(" reward: ", reward)
         else:
-            reward = 0
             done = False
-        return reward, done
+        return done
 
     def decideAction(self, action):
         '''行動を選択'''
