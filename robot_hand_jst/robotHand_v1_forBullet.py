@@ -118,7 +118,7 @@ class  Environment:
 
     def renderPicture(self, height=320, width=320):
         '''bullet側からカメラ画像を取得'''
-        base_pos, orn = p.getBasePositionAndOrientation(self.car)
+        base_pos, orn = p.getBasePositionAndOrientation(self.hand)
         yaw = p.getEulerFromQuaternion(orn)[2] # z軸方向から見た本体の回転角度
         rot_matrix = np.array([[np.cos(yaw), -np.sin(yaw)], [np.sin(yaw), np.cos(yaw)]]) # 回転行列
         target_relative_vec2D = np.array([2,0]) # 本体から見たtargetの相対位置
@@ -191,13 +191,12 @@ class  Environment:
         self.planeId = p.loadURDF("plane100.urdf")
 
         #オブジェクトモデルを表示
-        p.setAdditionalSearchPath("../../catkin_ws/src/simple_car/simple_car_description/urdf/")
+        p.setAdditionalSearchPath("~/atsushi/catkin_ws/src/robotHand_v1/urdf/")
         self.startPos = [0,0,0]
         self.startOrientation = p.getQuaternionFromEuler([0,0,0])
-        self.car = p.loadURDF("test_car.urdf", self.startPos, self.startOrientation)
+        self.hand = p.loadURDF("smahoHand.urdf", self.startPos, self.startOrientation)
         # 摩擦係数を変更
-        p.changeDynamics(self.car, 1, lateralFriction=100) # 前輪右
-        p.changeDynamics(self.car, 2, lateralFriction=100) # 前輪左
+        p.changeDynamics(self.hand, 3, lateralFriction=0) # 前輪ボール
         # ターゲットを表示
         targetX, targetY = np.random.permutation(np.arange(10))[0:2]
         self.targetPos = [targetX, targetY, 0]
@@ -248,23 +247,23 @@ class  Environment:
     def selectAction(self, action):
         if action == 0:  # 前
             p.setJointMotorControlArray(
-                    self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                    targetVelocities=[10,10,0,0],
+                    self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
+                    targetVelocities=[10,10],
                     forces=np.ones(4)*self.maxForce)
         elif action == 1:  # 後
             p.setJointMotorControlArray(
-                    self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                    targetVelocities=[-10,-10,0,0],
+                    self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
+                    targetVelocities=[-10,-10],
                     forces=np.ones(4)*self.maxForce)
         elif action == 2:  # 右
             p.setJointMotorControlArray(
-                    self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                    targetVelocities=[10,6,0,0],
+                    self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
+                    targetVelocities=[10,6],
                     forces=np.ones(4)*self.maxForce)
         elif action == 3:  # 左
             p.setJointMotorControlArray(
-                    self.car, np.arange(p.getNumJoints(self.car))[1:], p.VELOCITY_CONTROL,
-                    targetVelocities=[6,10,0,0],
+                    self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
+                    targetVelocities=[6,10],
                     forces=np.ones(4)*self.maxForce)
 
     def is_done(self, observation):
