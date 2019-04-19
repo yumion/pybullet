@@ -4,6 +4,7 @@ import pybullet_data
 from pybullet_envs.bullet import racecar
 import numpy as np
 import time
+import os
 
 # physicsClient = p.connect(p.DIRECT)
 physicsClient = p.connect(p.GUI)
@@ -19,10 +20,10 @@ p.setAdditionalSearchPath(pybullet_data.getDataPath())
 # racecar = p.loadURDF('racecar/racecar_differential.urdf', [0,0,0.5])
 racecar = racecar.Racecar(p, pybullet_data.getDataPath())
 
-p.setAdditionalSearchPath("../catkin_ws/src/simple_car/simple_car_description/urdf/")
+p.setAdditionalSearchPath(os.environ['HOME']+"/atsushi/catkin_ws/src/robotHand_v1/urdf/")
 startPos = [0,0,0]
 startOrientation = p.getQuaternionFromEuler([0,0,0])
-car = p.loadURDF("test_car.urdf", startPos, startOrientation)
+car = p.loadURDF("test.urdf", startPos, startOrientation)
 
 # 2台目
 cuid = p.loadURDF("test_car.urdf",[0,1,1], startOrientation)

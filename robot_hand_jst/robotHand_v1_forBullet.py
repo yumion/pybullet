@@ -6,7 +6,7 @@ from datetime import datetime  # 時刻を取得
 import pybullet as p
 import pybullet_data
 from PIL import Image
-
+import os
 
 '''定数の設定'''
 NUM_DIZITIZED = 10  # 各状態の離散値への分割数
@@ -191,7 +191,7 @@ class  Environment:
         self.planeId = p.loadURDF("plane100.urdf")
 
         #オブジェクトモデルを表示
-        p.setAdditionalSearchPath("~/atsushi/catkin_ws/src/robotHand_v1/urdf/")
+        p.setAdditionalSearchPath(os.environ['HOME']+"/atsushi/catkin_ws/src/robotHand_v1/urdf/")
         self.startPos = [0,0,0]
         self.startOrientation = p.getQuaternionFromEuler([0,0,0])
         self.hand = p.loadURDF("smahoHand.urdf", self.startPos, self.startOrientation)
@@ -249,22 +249,22 @@ class  Environment:
             p.setJointMotorControlArray(
                     self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
                     targetVelocities=[10,10],
-                    forces=np.ones(4)*self.maxForce)
+                    forces=np.ones(2)*self.maxForce)
         elif action == 1:  # 後
             p.setJointMotorControlArray(
                     self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
                     targetVelocities=[-10,-10],
-                    forces=np.ones(4)*self.maxForce)
+                    forces=np.ones(2)*self.maxForce)
         elif action == 2:  # 右
             p.setJointMotorControlArray(
                     self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
                     targetVelocities=[10,6],
-                    forces=np.ones(4)*self.maxForce)
+                    forces=np.ones(2)*self.maxForce)
         elif action == 3:  # 左
             p.setJointMotorControlArray(
                     self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
                     targetVelocities=[6,10],
-                    forces=np.ones(4)*self.maxForce)
+                    forces=np.ones(2)*self.maxForce)
 
     def is_done(self, observation):
         '''observationによって終了判定をする'''
