@@ -16,11 +16,11 @@ discount = 0.99  # 時間割引率
 lr = 0.1  # 学習係数
 MAX_STEPS = 50  # 1試行のstep数
 NUM_EPISODES = 100000  # 最大試行回数
-AREA_THRESH = 50  # 赤色物体面積の閾値．0~100で規格化してある
+AREA_THRESH = 10  # 赤色物体面積の閾値．0~100で規格化してある
 
 '''学習するときはFalse，学習済みのモデルを使用するときはTrue'''
 # 使うq_tableのファイル名を"trained_q_table.npy"とすること
-TEST_MODE = True
+TEST_MODE = False
 '''追加学習するときはTrue'''
 ADD_TRAIN_MODE = False
 
@@ -124,8 +124,8 @@ class  Environment:
         target_relative_vec2D = np.array([2,0]) # 本体から見たtargetの相対位置
         target_abs_vec2D = np.dot(rot_matrix, target_relative_vec2D) # targetの絶対位置
 
-        cam_eye = np.array(base_pos) + np.array([0,0,0.2])
-        cam_target = np.array(base_pos) + np.append(target_abs_vec2D, 0.2) # z=0.2は足()
+        cam_eye = np.array(base_pos) + np.array([-0.01,-0.020,0.020]) # カメラの座標
+        cam_target = np.array(base_pos) + np.append(target_abs_vec2D,0.20) # カメラの焦点の座標（ターゲットの座標）、ｚ軸方向を変える。
         cam_upvec = [0,0,1]
 
         view_matrix = p.computeViewMatrix(
@@ -147,30 +147,34 @@ class  Environment:
 
         return rgb_array
 
-    def green_detect(self, img):
-        '''緑色のマスク'''
+    def red_detect(self, img):
+        '''赤色のマスク'''
         # HSV色空間に変換
         hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-        # 緑色のHSVの値域
-        hsv_min = np.array([50, 100, 100])
-        hsv_max = np.array([70, 255, 255])
-        mask = cv2.inRange(hsv, hsv_min, hsv_max)
-        return mask
+        # 赤色のHSVの値域1
+        hsv_min = np.array([0, 127, 0])
+        hsv_max = np.array([149, 255, 255])
+        mask1 = cv2.inRange(hsv, hsv_min, hsv_max)
+        # 赤色のHSVの値域2
+        hsv_min = np.array([150, 127, 0])
+        hsv_max = np.array([179, 255, 255])
+        mask2 = cv2.inRange(hsv, hsv_min, hsv_max)
+        return mask1 + mask2
 
     def calc_area(self, img):
         '''面積計算'''
-        img = self.green_detect(img)
+        img = self.red_detect(img)
         pix_area = cv2.countNonZero(img)  # ピクセル数
         # パーセントを算出
         h, w = img.shape  # frameの面積
         per = round(100 * float(pix_area) / (w * h), 3)  # 0-100で規格化
         if RENDER:
-            print('GREEN_AREA: ', per)
+            print('DETECT_AREA: ', per)
         return pix_area, per
 
     def calc_center(self, img):
         '''重心座標(x,y)を求める'''
-        img = self.green_detect(img)
+        img = self.red_detect(img)
         mu = cv2.moments(img, False)
         x, y = int(mu["m10"] / (mu["m00"] + 1e-7)), int(mu["m01"] / (mu["m00"] + 1e-7))
         # 重心を丸でくくる
@@ -188,21 +192,22 @@ class  Environment:
         #フィールドを表示
         p.setAdditionalSearchPath(pybullet_data.getDataPath())
         p.setGravity(0,0,-10)
-        self.planeId = p.loadURDF("plane100.urdf")
+        self.planeId = p.loadURDF("plane.urdf")
 
         #オブジェクトモデルを表示
         p.setAdditionalSearchPath(os.environ['HOME']+"/atsushi/catkin_ws/src/robotHand_v1/urdf/")
-        self.startPos = [0,0,0]
-        self.startOrientation = p.getQuaternionFromEuler([0,0,0])
-        self.hand = p.loadURDF("smahoHand.urdf", self.startPos, self.startOrientation)
+        startPos = [0,0,0.03]
+        startOrientation = p.getQuaternionFromEuler([0,0,0])
+        self.hand = p.loadURDF("smahoHand.urdf", startPos, startOrientation)
         # 摩擦係数を変更
-        p.changeDynamics(self.hand, 3, lateralFriction=0) # 前輪ボール
+        p.changeDynamics(self.hand, 4, lateralFriction=0) # 前輪ボール
+        p.changeDynamics(self.hand, 2, lateralFriction=100)
+        p.changeDynamics(self.hand, 3, lateralFriction=100)
         # ターゲットを表示
-        targetX, targetY = np.random.permutation(np.arange(10))[0:2]
-        self.targetPos = [targetX, targetY, 0]
-        self.target = p.createCollisionShape(
-            p.GEOM_CYLINDER, radius=0.5, height=2, collisionFramePosition=self.targetPos)
-        p.createMultiBody(0, self.target)
+        for i in range(10):
+            targetX, targetY = np.random.permutation(np.arange(-1,1,0.1))[0:2] # 2x2マス以内にランダムで配置
+            targetPos = [targetX, targetY, 0.05]
+            target = p.loadURDF("target.urdf", targetPos, startOrientation)
 
         # 目標の面積, 重心の位置を取得する
         frame = self.renderPicture()
@@ -247,23 +252,23 @@ class  Environment:
     def selectAction(self, action):
         if action == 0:  # 前
             p.setJointMotorControlArray(
-                    self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
-                    targetVelocities=[10,10],
+                    self.hand, [2,3], p.VELOCITY_CONTROL,
+                    targetVelocities=[20,20],
                     forces=np.ones(2)*self.maxForce)
         elif action == 1:  # 後
             p.setJointMotorControlArray(
-                    self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
-                    targetVelocities=[-10,-10],
+                    self.hand, [2,3], p.VELOCITY_CONTROL,
+                    targetVelocities=[-20,-20],
                     forces=np.ones(2)*self.maxForce)
         elif action == 2:  # 右
             p.setJointMotorControlArray(
-                    self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
-                    targetVelocities=[10,6],
+                    self.hand, [2,3], p.VELOCITY_CONTROL,
+                    targetVelocities=[10,-10],
                     forces=np.ones(2)*self.maxForce)
         elif action == 3:  # 左
             p.setJointMotorControlArray(
-                    self.hand, np.arange(p.getNumJoints(self.hand))[1:], p.VELOCITY_CONTROL,
-                    targetVelocities=[6,10],
+                    self.hand, [2,3], p.VELOCITY_CONTROL,
+                    targetVelocities=[10,-10],
                     forces=np.ones(2)*self.maxForce)
 
     def is_done(self, observation):
@@ -273,6 +278,7 @@ class  Environment:
         area_sum, area_v, center_pos_x, center_pos_y, center_v_x, center_v_y = observation
         if area_sum > AREA_THRESH and center_pos_x >= 140 and center_pos_x <= 180:
             done = True
+            # hold
         return done
 
     def run(self, test_interval=10, num_test=10):

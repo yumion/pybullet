@@ -21,9 +21,11 @@ p.setAdditionalSearchPath(pybullet_data.getDataPath())
 racecar = racecar.Racecar(p, pybullet_data.getDataPath())
 
 p.setAdditionalSearchPath(os.environ['HOME']+"/atsushi/catkin_ws/src/robotHand_v1/urdf/")
-startPos = [0,0,0]
+startPos = [0,0,1]
 startOrientation = p.getQuaternionFromEuler([0,0,0])
-car = p.loadURDF("test.urdf", startPos, startOrientation)
+car = p.loadURDF("smahoHand.urdf", startPos, startOrientation)
+
+p.setJointMotorControlArray(car, [2,3], p.VELOCITY_CONTROL, targetVelocities=[6,10], forces=[10,10])
 
 # 2台目
 cuid = p.loadURDF("test_car.urdf",[0,1,1], startOrientation)
@@ -43,8 +45,8 @@ r2d2_pos, r2d2_orn = p.getBasePositionAndOrientation(r2d2)
 r2d2_pos
 p.multiplyTransforms(base_pos, orn, r2d2_pos, r2d2_orn)
 # 物理パラメータ変更
-p.getNumJoints(racecar.racecarUniqueId)
-p.getJointInfo(racecar.racecarUniqueId, 0)
+p.getNumJoints(car)
+p.getJointInfo(car, 3)
 p.getDynamicsInfo(racecar.racecarUniqueId, 0)
 # 摩擦係数を変更
 for joint in range(p.getNumJoints(car)):
@@ -148,6 +150,8 @@ for steer in [0,2]:
     p.setJointMotorControl2(racecar, steer, p.POSITION_CONTROL, targetPosition=0.3)
 
 racecar.applyAction([1,-0.6])
+
+
 
 #シミュレーション開始
 for i in range(5000):

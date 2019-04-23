@@ -2,6 +2,7 @@
 import pybullet as p
 import time
 import pybullet_data
+import os
 
 #ウインドウ表示
 p.connect(p.GUI) #or p.DIRECT for non-graphical version
@@ -15,14 +16,14 @@ p.setGravity(0,0,-10)
 planeId = p.loadURDF("plane.urdf")
 
 #オブジェクトの初期位置を設定
-cubeStartPos = [0,0,1]
+cubeStartPos = [0,3,1]
 cubeStartOrientation = p.getQuaternionFromEuler([0,0,0])
 
 #オブジェクトを読み込み表示
 boxId = p.loadURDF("r2d2.urdf",cubeStartPos, cubeStartOrientation)
 
-p.setAdditionalSearchPath("../../catkin_ws/src/simple_car/simple_car_description/urdf/")
-car = p.loadURDF("test_car.urdf",[1,0,0], cubeStartOrientation)
+p.setAdditionalSearchPath(os.environ['HOME']+"/atsushi/catkin_ws/src/robotHand_v1/urdf/")
+car = p.loadURDF("smahoHand.urdf", [0,0,1], cubeStartOrientation)
 
 #立方体を出現させる
 cuid = p.createCollisionShape(p.GEOM_BOX, halfExtents = [1, 1, 1])
@@ -31,7 +32,7 @@ p.createMultiBody(mass,cuid)
 
 #the number of joints using the getNumJoints API
 #ジョイント数を検索
-p.getNumJoints(boxId)
+p.getNumJoints(car)
 
 #jointの情報
 """
@@ -54,7 +55,7 @@ parentFramePos : joint position in parent frame
 parentFrameOrn : joint orientation in parent frame
 parentIndex : parent link index, -1 for base
 """
-p.getJointInfo(boxId,2)
+p.getJointInfo(car,1)
 
 """
 mass : mass in kg
@@ -68,15 +69,18 @@ spinning friction : spinning friction coefficient around contact normal
 contact damping : -1 if not available. damping of contact constraints.
 contact stiffness : -1 if not available. stiffness of contact constraints.
 """
-p.getDynamicsInfo(boxId,2)
+p.getDynamicsInfo(car,2)
 
 #モーターを動かす
 maxForce = 10
 mode = p.VELOCITY_CONTROL
-p.setJointMotorControlArray(boxId, jointIndices=[1,2,3,4], controlMode=mode, targetVelocities=[10,10,10,10], force=maxForce)
-
+p.changeDynamics(car, 4, lateralFriction=0) # 前輪ボール
+p.changeDynamics(car, 2, lateralFriction=100)
+p.changeDynamics(car, 3, lateralFriction=100)
+p.setJointMotorControlArray(car, jointIndices=[2,3], controlMode=mode, targetVelocities=[15,-15], forces=[maxForce, maxForce])
+p.setJointMotorControl2(car, 1)
 #シミュレーション開始
-for i in range (10000):
+for i in range (2000):
     p.stepSimulation()
     time.sleep(1./240.)#世界の時間スピード
 
