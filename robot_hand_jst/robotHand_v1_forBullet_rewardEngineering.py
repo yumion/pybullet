@@ -1,5 +1,7 @@
 # coding: utf-8
 import numpy as np
+import sys
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages') # ROSと競合してOpenCVをimportできない
 import cv2
 import time
 from datetime import datetime  # 時刻を取得
@@ -25,7 +27,7 @@ TEST_MODE = False
 ADD_TRAIN_MODE = False
 
 '''pybulletに描画するか'''
-RENDER = True
+RENDER = False
 
 class Agent:
     '''CartPoleのエージェントクラスです、棒付き台車そのものになります'''
@@ -62,12 +64,12 @@ class Brain:
         '''観測したobservation状態を、離散値に変換する'''
         area_sum, area_v, center_pos_x, center_pos_y, center_v_x, center_v_y = observation
         digitized = [
-            np.digitize(area_sum, bins=self.bins(0, 100.0, NUM_DIZITIZED)), #　面積の比率
-            np.digitize(area_v, bins=self.bins(-100.0, 100.0, NUM_DIZITIZED)),
-            np.digitize(center_pos_x, bins=self.bins(-50.0, 50.0, NUM_DIZITIZED)),
-            np.digitize(center_pos_y, bins=self.bins(-50.0, 50.0, NUM_DIZITIZED)),
-            np.digitize(center_v_x, bins=self.bins(-50.0, 50.0, NUM_DIZITIZED)),
-            np.digitize(center_v_y, bins=self.bins(-50.0, 50.0, NUM_DIZITIZED))
+            np.digitize(area_sum, bins=self.bins(0, 1.0, NUM_DIZITIZED)), #　面積の比率
+            np.digitize(area_v, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED)),
+            np.digitize(center_pos_x, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED)),
+            np.digitize(center_pos_y, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED)),
+            np.digitize(center_v_x, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED)),
+            np.digitize(center_v_y, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED))
         ]
         return sum([x * (NUM_DIZITIZED**i) for i, x in enumerate(digitized)]) #　6進数で表して計算を圧縮
 
@@ -207,7 +209,7 @@ class  Environment:
         for i in range(10):
             targetX, targetY = np.random.permutation(np.arange(-1,1,0.1))[0:2] # 2x2マス以内にランダムで配置
             targetPos = [targetX, targetY, 0.05]
-            target = p.loadURDF("target.urdf", targetPos, startOrientation)
+            self.target = p.loadURDF("target.urdf", targetPos, startOrientation)
 
         # 目標の面積, 重心の位置を取得する
         frame = self.renderPicture()
@@ -276,7 +278,7 @@ class  Environment:
         #終了判定は面積が閾値以上&面積の変化なし（重心位置が画像の真ん中？カメラの位置によるけど，とりあえずはなし）
         done = False
         area_sum, area_v, center_pos_x, center_pos_y, center_v_x, center_v_y = observation
-        if area_sum > AREA_THRESH and center_pos_x >= 140 and center_pos_x <= 180:
+        if area_sum > AREA_THRESH:
             done = True
             # hold
         return done
@@ -308,7 +310,9 @@ class  Environment:
                 # 行動a_tの実行により、s_{t+1}, r_{t+1}を求める
                 observation_next, done = self.act_env(observation, action)
                 # 報酬を与える
-                reward = observation[0]
+                # reward = observation_next[0]
+                reward = p.getClosestPoints(
+                    bodyA=self.hand, bodyB=self.target, distance=10000, linkIndexA=0)[0][8]
                 print('reward: ', reward)
                 # step+1の状態observation_nextを用いて,Q関数を更新する
                 self.agent.update_Q_function(observation, action, reward, observation_next)
@@ -341,22 +345,16 @@ class  Environment:
                 observation_next, done = self.act_env(observation, action)
                 # 報酬を与える
                 if done:
-                    reward = 1  # 目標を掴んだら報酬1を与える
                     images[0].save('success_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000) #成功エピソードの映像を保存
                 else:
-                    reward = 0 # 途中の報酬は0
-                    if RENDER:
-                        print('reward: ', reward)
+                    reward = reward = observation_next[0]
+                    print('reward: ', reward)
                 # 観測の更新
                 observation = observation_next
                 # 終了時の処理
                 if done:
                     print('{0} Episode: Finished after {1} time steps'.format(episode, step+1))
                     break
-                # 1episode内でdoneできなかったら罰を与える
-                if (step+1) == MAX_STEPS:
-                    reward = -1
-            print('\nreward: ', reward)
             test_reward.append(reward)
         # testの報酬のログをcsvで保存
         with open('test_reward.csv', 'a') as f:
