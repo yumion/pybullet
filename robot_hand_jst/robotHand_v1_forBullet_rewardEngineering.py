@@ -22,12 +22,12 @@ AREA_THRESH = 10  # 赤色物体面積の閾値．0~100で規格化してある
 
 '''学習するときはFalse，学習済みのモデルを使用するときはTrue'''
 # 使うq_tableのファイル名を"trained_q_table.npy"とすること
-TEST_MODE = True
+TEST_MODE = False
 '''追加学習するときはTrue'''
 ADD_TRAIN_MODE = False
 
 '''pybulletに描画するか'''
-RENDER = True
+RENDER = False
 
 class Agent:
     '''CartPoleのエージェントクラスです、棒付き台車そのものになります'''
@@ -285,13 +285,14 @@ class Environment:
 
         for episode in range(NUM_EPISODES):  # 試行数分繰り返す
             # test_intervalごとに性能をテスト
-            if episode % test_interval == 0 or TEST_MODE:
+            if (episode % test_interval == 0 and episode != 0) or TEST_MODE:
                 # 1episode以降はこっちに分岐
                 self.test(num_episodes=num_test)
-            elif episode == 0 or not TEST_MODE:
-                # はじめにtest log生成
-                with open('0507_test_reward.csv', 'w') as f:
-                    f.write('mean,std\n')
+            else:
+                if episode == 0:
+                    # はじめにtest log生成
+                    with open('test_reward_redArea.csv', 'w') as f:
+                        f.write('mean,std\n')
 
                 if not RENDER:
                     print('Episode:', episode)
@@ -305,8 +306,8 @@ class Environment:
                     # 行動a_tの実行により、s_{t+1}, r_{t+1}を求める
                     observation_next, done = self.act_env(observation, action)
                     # 報酬を与える
-                    # reward = observation_next[0]
-                    reward = self.reward(self.hand, self.target)
+                    reward = observation_next[0] # 面積値
+                    # reward = self.reward(self.hand, self.target)
                     # step+1の状態observation_nextを用いて,Q関数を更新する
                     self.agent.update_Q_function(observation, action, reward, observation_next)
                     # 観測の更新
@@ -337,17 +338,18 @@ class Environment:
                 # 行動a_tの実行により、s_{t+1}, r_{t+1}を求める
                 observation_next, done = self.act_env(observation, action)
                 # 報酬を与える
-                reward = self.reward(self.hand, self.target)
+                reward = observation_next[0] # 面積値
+                # reward = self.reward(self.hand, self.target)
                 test_reward.append(reward)
                 # 観測の更新
                 observation = observation_next
                 # 終了時の処理
                 if done:
                     print('{0} Episode: Finished after {1} time steps'.format(episode, step+1))
-                    images[0].save('0507test_success_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000) #成功エピソードの映像を保存
+                    images[0].save('test_success_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000) #成功エピソードの映像を保存
                     break
         # testの報酬のログをcsvで保存
-        with open('0507_test_reward.csv', 'a') as f:
+        with open('test_reward_redArea.csv', 'a') as f:
             rew_mean = np.array(test_reward).mean() # エピソードで平均
             rew_std = np.array(test_reward).std() # 標準偏差
             f.write(str(rew_mean)+','+str(rew_std)+'\n')
