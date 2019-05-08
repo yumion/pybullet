@@ -9,6 +9,7 @@
 
 # model's weight (too heavy)
 *.pkl
+*.npy
 
 # log
 *.csv

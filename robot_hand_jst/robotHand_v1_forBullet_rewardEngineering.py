@@ -11,23 +11,23 @@ from PIL import Image
 import os
 
 '''定数の設定'''
-NUM_DIZITIZED = 10  # 各状態の離散値への分割数
-NUM_STATES = 6
+NUM_DIZITIZED = 20  # 各状態の離散値への分割数
+NUM_STATES = 2
 NUM_ACTIONS = 4
-discount = 0.99  # 時間割引率
-lr = 0.1  # 学習係数
+discount = 0.9  # 時間割引率
+lr = 0.01  # 学習係数
 MAX_STEPS = 50  # 1試行のstep数
-NUM_EPISODES = 100000  # 最大試行回数
+NUM_EPISODES = 10000  # 最大試行回数
 AREA_THRESH = 10  # 赤色物体面積の閾値．0~100で規格化してある
 
 '''学習するときはFalse，学習済みのモデルを使用するときはTrue'''
 # 使うq_tableのファイル名を"trained_q_table.npy"とすること
-TEST_MODE = False
+TEST_MODE = True
 '''追加学習するときはTrue'''
 ADD_TRAIN_MODE = False
 
 '''pybulletに描画するか'''
-RENDER = False
+RENDER = True
 
 class Agent:
     '''CartPoleのエージェントクラスです、棒付き台車そのものになります'''
@@ -52,7 +52,7 @@ class Brain:
     def __init__(self, num_states, num_actions):
         self.num_actions = num_actions  # ロボットハンドの取れる行動数(コマンド数)
         if TEST_MODE or ADD_TRAIN_MODE:  # 保存したQ-tableを使用
-            self.q_table = np.load('trained_q_table.npy')
+            self.q_table = np.load('0507_q_table.npy')
         else:  # Qテーブルを作成。行数は状態を分割数^(4変数)にデジタル変換した値、列数は行動数を示す
             self.q_table = np.random.uniform(low=0, high=1, size=(NUM_DIZITIZED**num_states, num_actions))
 
@@ -62,14 +62,10 @@ class Brain:
 
     def digitize_state(self, observation):
         '''観測したobservation状態を、離散値に変換する'''
-        area_sum, area_v, center_pos_x, center_pos_y, center_v_x, center_v_y = observation
+        targetPosInHand_x, targetPosInHand_y = observation
         digitized = [
-            np.digitize(area_sum, bins=self.bins(0, 1.0, NUM_DIZITIZED)), #　面積の比率
-            np.digitize(area_v, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED)),
-            np.digitize(center_pos_x, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED)),
-            np.digitize(center_pos_y, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED)),
-            np.digitize(center_v_x, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED)),
-            np.digitize(center_v_y, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED))
+            np.digitize(targetPosInHand_x, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED)), #　面積の比率
+            np.digitize(targetPosInHand_y, bins=self.bins(-1.0, 1.0, NUM_DIZITIZED))
         ]
         return sum([x * (NUM_DIZITIZED**i) for i, x in enumerate(digitized)]) #　6進数で表して計算を圧縮
 
@@ -104,13 +100,14 @@ class Brain:
         return action
 
 
-class  Environment:
+class Environment:
     '''CartPoleを実行する環境のクラスです'''
 
     def __init__(self):
         self.num_states = NUM_STATES  # 課題の状態の数(面積と重心(x,y)と、それぞれの変化量で6つ)
         self.num_actions = NUM_ACTIONS  # ロボットハンドの行動（前進，後退，右旋回，左旋回，握る，離す，止まる）
         self.agent = Agent(self.num_states, self.num_actions)  # 環境内で行動するAgentを生成
+        print('env')
         '''pybullet'''
         if RENDER:
             p.connect(p.GUI)
@@ -172,7 +169,7 @@ class  Environment:
         per = round(100 * float(pix_area) / (w * h), 3)  # 0-100で規格化
         if RENDER:
             print('DETECT_AREA: ', per)
-        return pix_area, per
+        return per
 
     def calc_center(self, img):
         '''重心座標(x,y)を求める'''
@@ -206,35 +203,23 @@ class  Environment:
         p.changeDynamics(self.hand, 2, lateralFriction=100)
         p.changeDynamics(self.hand, 3, lateralFriction=100)
         # ターゲットを表示
-        for i in range(10):
+        for i in range(1):
             targetX, targetY = np.random.permutation(np.arange(-1,1,0.1))[0:2] # 2x2マス以内にランダムで配置
             targetPos = [targetX, targetY, 0.05]
             self.target = p.loadURDF("target.urdf", targetPos, startOrientation)
 
-        # 目標の面積, 重心の位置を取得する
-        frame = self.renderPicture()
-        _, area_sum = self.calc_area(frame)
-        area_v = 0
-        center_pos_x, center_pos_y = self.calc_center(frame)
-        center_v_x = 0
-        center_v_y = 0
+        return self.get_env()
 
-        observation = (area_sum, area_v, center_pos_x, center_pos_y, center_v_x, center_v_y)
-
-        return observation, frame
-
-    def get_env(self, area_sum_before, center_pos_before_x, center_pos_before_y):
+    def get_env(self):
         '''環境を認識する'''
         '''カメラで写真をとりOpenCVで面積と重心を取得する'''
         frame = self.renderPicture()
-        # 赤色の面積とその変化量, 重心の位置とその変化量を取得する
-        _, area_sum = self.calc_area(frame)
-        area_v = area_sum - area_sum_before
-        center_pos_x, center_pos_y = self.calc_center(frame)
-        center_v_x = center_pos_x - center_pos_before_x
-        center_v_y = center_pos_y - center_pos_before_y
-        # 観測量として返す
-        observation = (area_sum, area_v, center_pos_x, center_pos_y, center_v_x, center_v_y)
+        handpos, handorn = p.getBasePositionAndOrientation(self.hand)
+        targetpos, targetorn = p.getBasePositionAndOrientation(self.target)
+        invHandPos, invHandOrn = p.invertTransform(handpos, handorn)
+        targetPosInHand, targetOrnInHand = p.multiplyTransforms(invHandPos, invHandOrn, targetpos, targetorn)
+        # 観測
+        observation = (targetPosInHand[0], targetPosInHand[1]) # ハンドからみたターゲットの相対位置(x,y)
         return observation, frame
 
     def act_env(self, observation, action):
@@ -245,9 +230,9 @@ class  Environment:
             if RENDER:
                 time.sleep(1./240.)
 
-        area_sum, _, center_pos_x, center_pos_y, _, _ = observation
-        observation_next, _ = self.get_env(area_sum, center_pos_x, center_pos_y)
-        done = self.is_done(observation_next)
+        targetPosInHand_x, targetPosInHand_y = observation
+        observation_next, frame = self.get_env()
+        done = self.is_done(frame)
 
         return observation_next, done
 
@@ -273,15 +258,25 @@ class  Environment:
                     targetVelocities=[10,-10],
                     forces=np.ones(2)*self.maxForce)
 
-    def is_done(self, observation):
+    def is_done(self, frame):
         '''observationによって終了判定をする'''
         #終了判定は面積が閾値以上&面積の変化なし（重心位置が画像の真ん中？カメラの位置によるけど，とりあえずはなし）
         done = False
-        area_sum, area_v, center_pos_x, center_pos_y, center_v_x, center_v_y = observation
+        area_sum = self.calc_area(frame)
         if area_sum > AREA_THRESH:
             done = True
             # hold
         return done
+
+    def reward(self, bodyA, bodyB):
+        closestPoints = p.getClosestPoints(bodyA, bodyB, 10000)
+        numPt = len(closestPoints)
+        reward = -1000
+        # print(numPt)
+        if (numPt > 0):
+            reward = -closestPoints[0][8]
+            print('reward:', reward)
+        return reward
 
     def run(self, test_interval=10, num_test=10):
         '''実行'''
@@ -290,38 +285,36 @@ class  Environment:
 
         for episode in range(NUM_EPISODES):  # 試行数分繰り返す
             # test_intervalごとに性能をテスト
-            if episode == 0:
-                # はじめにtest log生成
-                with open('test_reward.csv', 'w') as f:
-                    f.write('mean,std\n')
-            elif episode % test_interval == 0 or TEST_MODE:
+            if episode % test_interval == 0 or TEST_MODE:
                 # 1episode以降はこっちに分岐
                 self.test(num_episodes=num_test)
+            elif episode == 0 or not TEST_MODE:
+                # はじめにtest log生成
+                with open('0507_test_reward.csv', 'w') as f:
+                    f.write('mean,std\n')
 
-            if not RENDER:
-                print('Episode:', episode)
-            observation, frame = self.reset()  # 環境の初期化
+                if not RENDER:
+                    print('Episode:', episode)
+                observation, frame = self.reset()  # 環境の初期化
 
-            for step in range(MAX_STEPS):  # 1エピソードのループ
-                if RENDER:
-                    print('Step: {0} of Episode: {1}'.format(step+1, episode))
-                # 行動を求める
-                action = self.agent.get_action(observation, episode, test=False)
-                # 行動a_tの実行により、s_{t+1}, r_{t+1}を求める
-                observation_next, done = self.act_env(observation, action)
-                # 報酬を与える
-                # reward = observation_next[0]
-                reward = p.getClosestPoints(
-                    bodyA=self.hand, bodyB=self.target, distance=10000, linkIndexA=0)[0][8]
-                print('reward: ', reward)
-                # step+1の状態observation_nextを用いて,Q関数を更新する
-                self.agent.update_Q_function(observation, action, reward, observation_next)
-                # 観測の更新
-                observation = observation_next
-                # 終了時の処理
-                if done:
-                    print('{0} Episode: Finished after {1} time steps'.format(episode, step+1))
-                    break
+                for step in range(MAX_STEPS):  # 1エピソードのループ
+                    if RENDER:
+                        print('Step: {0} of Episode: {1}'.format(step+1, episode))
+                    # 行動を求める
+                    action = self.agent.get_action(observation, episode, test=False)
+                    # 行動a_tの実行により、s_{t+1}, r_{t+1}を求める
+                    observation_next, done = self.act_env(observation, action)
+                    # 報酬を与える
+                    # reward = observation_next[0]
+                    reward = self.reward(self.hand, self.target)
+                    # step+1の状態observation_nextを用いて,Q関数を更新する
+                    self.agent.update_Q_function(observation, action, reward, observation_next)
+                    # 観測の更新
+                    observation = observation_next
+                    # 終了時の処理
+                    if done:
+                        print('{0} Episode: Finished after {1} time steps'.format(episode, step+1))
+                        break
 
     def test(self, num_episodes):
         '''性能をテスト'''
@@ -339,30 +332,27 @@ class  Environment:
                 frame = self.renderPicture()
                 frame = Image.fromarray(frame)
                 images.append(frame)
-                # 行動を求める
+                False# 行動を求める
                 action = self.agent.get_action(observation, episode, test=True)
                 # 行動a_tの実行により、s_{t+1}, r_{t+1}を求める
                 observation_next, done = self.act_env(observation, action)
                 # 報酬を与える
-                if done:
-                    images[0].save('success_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000) #成功エピソードの映像を保存
-                else:
-                    reward = reward = observation_next[0]
-                    print('reward: ', reward)
+                reward = self.reward(self.hand, self.target)
+                test_reward.append(reward)
                 # 観測の更新
                 observation = observation_next
                 # 終了時の処理
                 if done:
                     print('{0} Episode: Finished after {1} time steps'.format(episode, step+1))
+                    images[0].save('0507test_success_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000) #成功エピソードの映像を保存
                     break
-            test_reward.append(reward)
         # testの報酬のログをcsvで保存
-        with open('test_reward.csv', 'a') as f:
+        with open('0507_test_reward.csv', 'a') as f:
             rew_mean = np.array(test_reward).mean() # エピソードで平均
             rew_std = np.array(test_reward).std() # 標準偏差
             f.write(str(rew_mean)+','+str(rew_std)+'\n')
         # 最終エピソードの動き
-        images[0].save('final_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000)
+        images[0].save('0507test_final_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000)
 
 
 # main
