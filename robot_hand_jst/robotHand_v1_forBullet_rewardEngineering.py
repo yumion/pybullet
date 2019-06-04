@@ -27,7 +27,7 @@ TEST_MODE = False
 ADD_TRAIN_MODE = False
 
 '''pybulletに描画するか'''
-RENDER = False
+RENDER = True
 
 class Agent:
     '''CartPoleのエージェントクラスです、棒付き台車そのものになります'''
@@ -212,7 +212,6 @@ class Environment:
 
     def get_env(self):
         '''環境を認識する'''
-        '''カメラで写真をとりOpenCVで面積と重心を取得する'''
         frame = self.renderPicture()
         handpos, handorn = p.getBasePositionAndOrientation(self.hand)
         targetpos, targetorn = p.getBasePositionAndOrientation(self.target)
@@ -291,7 +290,7 @@ class Environment:
             else:
                 if episode == 0:
                     # はじめにtest log生成
-                    with open('test_reward_redArea.csv', 'w') as f:
+                    with open('test_reward_redArea-1.csv', 'w') as f:
                         f.write('mean,std\n')
 
                 if not RENDER:
@@ -349,12 +348,12 @@ class Environment:
                     images[0].save('test_success_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000) #成功エピソードの映像を保存
                     break
         # testの報酬のログをcsvで保存
-        with open('test_reward_redArea.csv', 'a') as f:
+        with open('test_reward_redArea-1.csv', 'a') as f:
             rew_mean = np.array(test_reward).mean() # エピソードで平均
             rew_std = np.array(test_reward).std() # 標準偏差
             f.write(str(rew_mean)+','+str(rew_std)+'\n')
         # 最終エピソードの動き
-        images[0].save('0507test_final_episode.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000)
+        images[0].save('test_final_episode-1.gif', save_all=True, append_images=images[1:], optimize=False, duration=1000)
 
 
 # main
