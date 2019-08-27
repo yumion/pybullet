@@ -1,3 +1,4 @@
+# coding: utf-8
 """
 An example of QT-Opt.
 """
@@ -25,7 +26,7 @@ from machina.samplers import EpiSampler
 from machina import logger
 from machina.utils import set_device, measure
 
-from simple_net import QNet
+from simple_net import QTOptNet, FlattenedObservationWrapper, QNetCNN
 
 
 parser = argparse.ArgumentParser()
@@ -45,21 +46,15 @@ parser.add_argument('--num_parallel', type=int, default=4,
 parser.add_argument('--cuda', type=int, default=-1, help='cuda device number.')
 parser.add_argument('--data_parallel', action='store_true', default=False,
                     help='If True, inference is done in parallel on gpus.')
-
-parser.add_argument('--max_steps_per_iter', type=int, default=1000,
+parser.add_argument('--max_steps_per_iter', type=int, default=20,
                     help='Number of steps to use in an iteration.')
 parser.add_argument('--batch_size', type=int, default=32)
 parser.add_argument('--qf_lr', type=float, default=1e-3,
                     help='Q function learning rate.')
-parser.add_argument('--h1', type=int, default=32,
-                    help='hidden size of layer1.')
-parser.add_argument('--h2', type=int, default=32,
-                    help='hidden size of layer2.')
 parser.add_argument('--tau', type=float, default=0.0001,
                     help='Coefficient of target function.')
 parser.add_argument('--gamma', type=float, default=0.9,
                     help='Discount factor.')
-
 parser.add_argument('--lag', type=int, default=6000,
                     help='Lag of gradient steps of target function2.')
 parser.add_argument('--num_iter', type=int, default=2,
@@ -79,6 +74,8 @@ parser.add_argument('--save_memory', action='store_true',
                     help='If true, save memory while need more computation time by for-sentence.')
 args = parser.parse_args()
 
+
+torch.backends.cudnn.enabled = False
 
 # logフォルダ確保
 if not os.path.exists(args.log):
@@ -108,38 +105,54 @@ logger.add_tabular_output(score_file)
 # Gymのenviromentを生成
 from pybullet_envs.bullet.kukaCamGymEnv import KukaCamGymEnv
 env = KukaCamGymEnv(renders=False, isDiscrete=False)  # renders=Trueだとmachinaのtrain進まない。相性が悪い？
+env = FlattenedObservationWrapper(env)
+flattend_observation_space = env.flattend_observation_space
+
+env = GymEnv(env, log_dir=os.path.join(args.log, 'movie'), record_video=args.record)
+env.env.seed(args.seed)
+
 # 観測と行動の次元
 observation_space = env.observation_space
 action_space = env.action_space
+print('obs: {0}, act: {1}'.format(observation_space, action_space))
 
 # Q-Network
-qf_net = QNetCNN(observation_space, action_space, args.h1, args.h2)
-qf = DeterministicSAVfunc(observation_space, action_space, qf_net, data_parallel=args.data_parallel) # 決定的行動状態価値関数?q-netの出力の形を少し整える
+print('Qnet')
+qf_net = QTOptNet(observation_space, action_space)
+qf = DeterministicSAVfunc(flattend_observation_space, action_space, qf_net, data_parallel=args.data_parallel) # 決定的行動状態価値関数?q-netの出力の形を少し整える
 
 # target Q network theta1
-targ_qf1_net = QNetCNN(observation_space, action_space, args.h1, args.h2)
+print('target1_net')
+targ_qf1_net = QTOptNet(observation_space, action_space)
 targ_qf1_net.load_state_dict(qf_net.state_dict()) # model（重み）をロード(q-netからコピー)
-targ_qf1 = CEMDeterministicSAVfunc(observation_space, action_space, targ_qf1_net, num_sampling=args.num_sampling,
-                                   num_best_sampling=args.num_best_sampling, num_iter=args.num_iter,
-                                   multivari=args.multivari, data_parallel=args.data_parallel, save_memory=args.save_memory) #CrossEntropy Methodよくわからん
+targ_qf1 = CEMDeterministicSAVfunc(
+        flattend_observation_space, action_space,
+        targ_qf1_net, num_sampling=args.num_sampling,
+        num_best_sampling=args.num_best_sampling, num_iter=args.num_iter, multivari=args.multivari,
+        data_parallel=args.data_parallel, save_memory=args.save_memory) #CrossEntropy Methodよくわからん
 
 # lagged network
-lagged_qf_net = QNetCNN(observation_space, action_space, args.h1, args.h2)
+print('lagged_net')
+lagged_qf_net = QTOptNet(observation_space, action_space)
 lagged_qf_net.load_state_dict(qf_net.state_dict()) # model（重み）をロード(theta1からコピー)
-lagged_qf = DeterministicSAVfunc(observation_space, action_space, lagged_qf_net, data_parallel=args.data_parallel)
+lagged_qf = DeterministicSAVfunc(flattend_observation_space, action_space, lagged_qf_net, data_parallel=args.data_parallel)
 
 # target network theta2
-targ_qf2_net = QNetCNN(observation_space, action_space, args.h1, args.h2)
+print('target2_net')
+targ_qf2_net = QTOptNet(observation_space, action_space)
 targ_qf2_net.load_state_dict(lagged_qf_net.state_dict()) # model（重み）をロード(6000stepsごとにlagged netからコピー)
-targ_qf2 = DeterministicSAVfunc(observation_space, action_space, targ_qf2_net, data_parallel=args.data_parallel)
+targ_qf2 = DeterministicSAVfunc(flattend_observation_space, action_space, targ_qf2_net, data_parallel=args.data_parallel)
 
 # q-networkの最適化手法
+print('optimizer')
 optim_qf = torch.optim.Adam(qf_net.parameters(), args.qf_lr)
 
 # epsilon-greedy policy
-pol = ArgmaxQfPol(observation_space, action_space, targ_qf1, eps=args.eps)
+print('Policy')
+pol = ArgmaxQfPol(flattend_observation_space, action_space, targ_qf1, eps=args.eps)
 
 # replay bufferからサンプリング?
+print('sampler')
 sampler = EpiSampler(env, pol, num_parallel=args.num_parallel, seed=args.seed)
 
 # off-policy experience. Traj=(s,a,r,s')
@@ -149,21 +162,23 @@ total_epi = 0
 total_step = 0
 total_grad_step = 0 # パラメータ更新回数
 num_update_lagged = 0 # lagged netの更新回数
-max_rew = -1e6
+max_rew = -1000
 
+print('start')
 while args.max_epis > total_epi:
     with measure('sample'):
+        print('sampling')
         # policyにしたがって行動し、経験を貯める（env.stepをone_epiの__init__内で行っている）
+        # off-policy
         epis = sampler.sample(pol, max_steps=args.max_steps_per_iter)
     with measure('train'):
-        # on-policyのサンプリング?
+        # on-policyのサンプリング
+        print('on-policy')
         on_traj = Traj(traj_device='cpu')
         on_traj.add_epis(epis)
-
         on_traj = epi_functional.add_next_obs(on_traj)
         on_traj.register_epis()
-        # off-policyのサンプリング?
-        off_traj.add_traj(on_traj)
+        off_traj.add_traj(on_traj)  # off-policyに加える
 
         # episodeとstepのカウント
         total_epi += on_traj.num_epi
@@ -177,6 +192,7 @@ while args.max_epis > total_epi:
             targ_qf1.dp_run = True
             targ_qf2.dp_run = True
         # train
+        print('train')
         result_dict = qtopt.train(
             off_traj, qf, lagged_qf, targ_qf1, targ_qf2, optim_qf,
             epoch, args.batch_size, args.tau, args.gamma,
@@ -226,49 +242,4 @@ while args.max_epis > total_epi:
     # 初期化
     del on_traj
 del sampler
-env.close()
-
-
-### TEST
-import time
-import os
-print('-*- Best policy rendering -*-')
-# make gym enviroment
-import gym
-from pybullet_envs.bullet.racecarGymEnv import RacecarGymEnv
-env = RacecarGymEnv(maxsteps=4000, renders=True, isDiscrete=False)
-observation_space = env.observation_space
-action_space = env.action_space
-
-import torch
-from machina.pols import ArgmaxQfPol
-from machina.vfuncs import CEMDeterministicSAVfunc
-from simple_net import QNet
-# select CUDA
-device_name = 'cpu' if args.cuda < 0 else "cuda:{}".format(args.cuda)
-device = torch.device(device_name) # cuda:0じゃないと動かない
-set_device(device)
-torch.set_default_tensor_type('torch.cuda.FloatTensor') # これをしないと同じGPUに乗らない
-# load best Q-function
-best_path = os.path.join(args.log, 'models/qf_max.pkl')
-qf_net = QNet(observation_space, action_space, args.h1, args.h2)
-best_qf = CEMDeterministicSAVfunc(observation_space, action_space, qf_net) # CEMDeterministicSAVfuncじゃないとエラ−.DeterministicSAVfuncにはmaxメソッドがない
-best_qf.load_state_dict(torch.load(best_path))
-# load best policy
-best_pol = ArgmaxQfPol(observation_space, action_space, best_qf, eps=0)
-
-# show your trained policy's behavior
-done = False
-obs = env.reset()
-for step in range(10000):
-    if done:
-        time.sleep(1) # when the boundary of eposode
-        obs = env.reset()
-    obs = torch.tensor(obs, dtype=torch.float)
-    ac_real, ac, a_i = best_pol.forward(obs)
-    ac_real = ac_real.reshape(best_pol.action_space.shape)
-    next_obs, rew, done, _ = env.step(np.array(ac_real))
-    obs = next_obs
-    env.render()
-# close your environment
 env.close()

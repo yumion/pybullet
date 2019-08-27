@@ -2,11 +2,13 @@
 Examples of network architecture.
 """
 
+import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn.init import kaiming_uniform_, uniform_
 import torch.nn.functional as F
 import gym
+from gym import ObservationWrapper
 
 
 def mini_weight_init(m):
@@ -91,10 +93,7 @@ class QNet(nn.Module):
     def __init__(self, observation_space, action_space, h1=300, h2=400):
         super(QNet, self).__init__()
         self.fc1 = nn.Linear(observation_space.shape[0], h1)
-        if isinstance(action_space, gym.spaces.Box):
-            self.fc2 = nn.Linear(action_space.shape[0] + h1, h2)
-        else:
-            self.fc2 = nn.Linear(action_space.n + h1, h2)
+        self.fc2 = nn.Linear(action_space.shape[0] + h1, h2)
         self.output_layer = nn.Linear(h2, 1)
         self.fc1.apply(weight_init)
         self.fc2.apply(weight_init)
@@ -107,23 +106,40 @@ class QNet(nn.Module):
         return self.output_layer(h)
 
 
-class QNetCNN(nn.Module):
+class FlattenedObservationWrapper(ObservationWrapper):
+
+    def __init__(self, env):
+        super(FlattenedObservationWrapper, self).__init__(env)
+        self.observation_space = env.observation_space
+        self.flattend_observation_space = env.observation_space.sample().reshape(-1)
+
+    def observation(self, observation):
+        return observation.reshape(-1)
+
+
+class QTOptNet(nn.Module):
+
     def __init__(self, observation_space, action_space):
-        super(QNetCNN, self).__init__()
+        super(QTOptNet, self).__init__()
+        self.observation_space = observation_space
         # conv
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=6, stride=2)
-        self.conv2 = nn.Conv2d(64, 64, kernel_size=5, stride=1)
-        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1)
+        self.conv1 = nn.Conv2d(4, 64, kernel_size=6, stride=2, padding=2)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=5, stride=1, padding=2)
+        self.conv3 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
         # pool
-        self.pool1 = nn.MaxPool2d(3, stride=2)
+        self.pool1 = nn.MaxPool2d(3, stride=3)
         self.pool2 = nn.MaxPool2d(2, stride=2)
         # fc
         self.fc1 = nn.Linear(action_space.shape[0], 256)
         self.fc2 = nn.Linear(256, 64)
-        self.fc3 = nn.Linear(64, 64)
+        self.fc3 = nn.Linear(4032, 64)
+        self.fc4 = nn.Linear(64, 64)
         self.output_layer = nn.Linear(64, 1)
 
     def forward(self, ob, ac):
+        batch_size = ob.shape[0]
+        ob = ob.reshape([batch_size] + list(self.observation_space.shape))
+        ob = ob.transpose(1, 2).transpose(1, 3)  # convert to channel first
         # observation net
         ob = F.relu(self.conv1(ob))
         ob = self.pool1(ob)
@@ -133,19 +149,50 @@ class QNetCNN(nn.Module):
         # action net
         ac = F.relu(self.fc1(ac))
         ac = F.relu(self.fc2(ac))
-        ac = ac.view(-1, 1, 1, 64)
-        # concat
-        h = torch.cat([ob, ac], dim=-1)
+        ac = ac.view(-1, 64, 1, 1)
+        # tiled layer
+        ac_tiled = ac.repeat(1, 1, ob.size()[2], ob.size()[3])
+        # add action feature
+        h = ob + ac_tiled
         for i in range(6):
             h = F.relu(self.conv3(h))
         h = self.pool2(h)
         for i in range(3):
             h = F.relu(self.conv3(h))
-        h = h.view(-1, 64)
+        h = h.view(h.size()[0], -1)  # flatten
         h = F.relu(self.fc3(h))
-        out = F.sigmoid(self.output_layer(h))
-
+        h = F.relu(self.fc4(h))
+        out = torch.sigmoid(self.output_layer(h))
         return out
+
+
+class QNetCNN(nn.Module):
+    def __init__(self, observation_space, action_space):
+        super(QNetCNN, self).__init__()
+        self.observation_space = observation_space
+        # conv
+        self.conv1 = nn.Conv2d(4, 64, kernel_size=3, stride=1, padding=1)
+        self.conv2 = nn.Conv2d(64, 64, kernel_size=3, stride=1, padding=1)
+        # pool
+        self.pool = nn.MaxPool2d(2, stride=2)
+        # fc
+        self.fc1 = nn.Linear(64*42*32 + action_space.shape[0], 1024)
+        self.output_layer = nn.Linear(1024, 1)
+
+    def forward(self, ob, ac):
+        batch_size = ob.shape[0]
+        ob = ob.reshape([batch_size] + list(self.observation_space.shape))
+        ob = ob.transpose(1,2).transpose(1,3)  # convert to channel first
+        ob = F.relu(self.conv1(ob))
+        ob = self.pool(ob)
+        ob = F.relu(self.conv2(ob))
+        ob = self.pool(ob)
+        ob = F.relu(self.conv2(ob))
+        ob = self.pool(ob)
+        ob = ob.view(batch_size, -1)
+        h = torch.cat([ob, ac], dim=-1)
+        h = F.relu(self.fc1(h))
+        return self.output_layer(h)
 
 
 class ModelNet(nn.Module):
